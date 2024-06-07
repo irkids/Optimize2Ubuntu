@@ -1,11 +1,8 @@
 #!/bin/bash
 
-apt update && apt upgrade -y
+sudo apt-get update -y && apt-get upgrade -y
 sudo apt-get install pkg-config libssl-dev -y
 apt install curl socat -y
-apt install -y htop iotop net-tools nmap
-sudo apt install fail2ban -y
-sudo systemctl enable fail2ban
 sudo service ssh restart
 sudo apt-get -y install software-properties-common apt-get install -y stunnel4 cmake screenfetch openssl
 sudo add-apt-repository ppa:ondrej/php -y
