@@ -33,21 +33,3 @@ systemctl reload sshd
 systemctl restart sshd
 service ssh reload
 service ssh restart
-
-
-echo "Optimize2Ubuntu Installed!"
-
-
-echo " Restart The Server To Optimize Ubuntu Server "
-
-echo -e "Warning: This command will reboot your server."
-
-echo -e "Do you want to reboot your server? (Y/N)"
-read answer
-
-if [ "$answer" = "y" ]; then
-  echo -e "Server rebooting ..."
-  sudo reboot
-else
-  echo -e "Not reboot."
-fi
