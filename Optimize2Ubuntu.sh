@@ -4,16 +4,9 @@ apt update && apt upgrade -y
 sudo apt-get install pkg-config libssl-dev -y
 apt install curl socat -y
 apt install -y htop iotop net-tools nmap
-sudo NEETRESTART_MODE=a apt-get update --yes
-echo "net.ipv4.tcp_fastopen=3" |
- sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
-sysctl net.ipv4.tcp_fastopen
 sudo apt install fail2ban -y
 sudo systemctl enable fail2ban
 sudo service ssh restart
-sudo apt install rkhunter -y
-sudo rkhunter --check
 sudo apt-get -y install software-properties-common apt-get install -y stunnel4 cmake screenfetch openssl
 sudo add-apt-repository ppa:ondrej/php -y
 apt-get install apache2 zip unzip net-tools curl mariadb-server -y
@@ -24,7 +17,6 @@ apt install php8.1 php8.1-mysql php8.1-xml php8.1-curl cron -y
 apt install php8.2 php8.2-mysql php8.2-xml php8.2-curl cron -y
 apt install php8.3 php8.3-mysql php8.3-xml php8.3-curl cron -y
 sudo apt-get install git -y
-sudo apt install ufw nginx curl jq python3-pip python3-setuptools
 sudo apt install perl -y
 sudo apt install libdbd-mysql-perl -y
 sudo apt install software-properties-common
