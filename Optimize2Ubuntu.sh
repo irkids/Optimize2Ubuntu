@@ -1,14 +1,6 @@
 #!/bin/bash
 
 apt update && apt upgrade -y
-echo "vm.swappiness=10" |
- sudo tee -a /etc/sysctl.conf
-echo "vm.vfs_cache_pressure=50" |
- sudo tee -a /etc/sysctl.conf
-echo "kernel.sched_min_granularity_ns=1000000" |
- sudo tee -a /etc/sysctl.conf
-echo "kernel.sched_latency_ns=10000000" |
- sudo tee -a /etc/sysctl.conf
 echo "nameserver 8.8.8.8" |
  sudo tee -a /etc/resolv.conf
 echo "nameserver 8.8.4.4" |
