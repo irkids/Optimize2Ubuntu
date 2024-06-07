@@ -1,21 +1,10 @@
 #!/bin/bash
 
 apt update && apt upgrade -y
-echo "nameserver 8.8.8.8" |
- sudo tee -a /etc/resolv.conf
-echo "nameserver 8.8.4.4" |
- sudo tee -a /etc/resolv.conf
-sudo ifconfig eth0 mtu 1400
 sudo apt-get install pkg-config libssl-dev -y
 apt install curl socat -y
 apt install -y htop iotop net-tools nmap
 sudo NEETRESTART_MODE=a apt-get update --yes
-
-if [[ $(uname -r | cut -d. -f1) -lt 4 ]]; then
-  echo "Your kernel does not support TCP Fast Open!"
-  exit 1
-fi
-
 echo "net.ipv4.tcp_fastopen=3" |
  sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
