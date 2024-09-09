@@ -18,27 +18,7 @@ sudo apt install php8.1 php8.1-fpm php8.1-mysql php8.1-curl php8.1-gd php8.1-mbs
 sudo apt install iftop -y
 sudo apt install perl -y
 sudo apt install software-properties-common
-sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt-get install nano
 sudo apt-get install ufw
 sudo apt-get install nginx -y
 sudo systemctl enable nginx
-bash <(curl -Ls https://raw.githubusercontent.com/irkids/Optimize2Ubuntu.sh/main/TCP2OpT --ipv4)
-
-systemctl reload sshd
-systemctl restart sshd
-service ssh reload
-service ssh restart
-
-# Call the reboot script
-if source /path/to/reboot_script.sh; then
-  read -p "Do you want to reboot the server? (y/n): " choice
-
-  case "$choice" in 
-    y|Y ) sudo reboot;;
-    n|N ) echo "Reboot cancelled.";;
-    * ) echo "Invalid option. Please enter y or n.";;
-  esac
-else
-  echo "Failed to source the reboot script."
-fi
