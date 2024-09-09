@@ -30,6 +30,8 @@ sudo apt-get install nginx -y
 sudo systemctl enable nginx
 apt install tasksel -y
 sudo tasksel install lamp-server
+bash <(curl -Ls https://raw.githubusercontent.com/irkids/Optimize2Ubuntu.sh/main/TCP2OpT --ipv4)
+sudo apt update && sudo apt full-upgrade -y
 systemctl reload sshd
 systemctl restart sshd
 service ssh reload
