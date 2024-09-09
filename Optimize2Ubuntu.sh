@@ -34,3 +34,16 @@ systemctl reload sshd
 systemctl restart sshd
 service ssh reload
 service ssh restart
+
+# Call the reboot script
+if source /path/to/reboot_script.sh; then
+  read -p "Do you want to reboot the server? (y/n): " choice
+
+  case "$choice" in 
+    y|Y ) sudo reboot;;
+    n|N ) echo "Reboot cancelled.";;
+    * ) echo "Invalid option. Please enter y or n.";;
+  esac
+else
+  echo "Failed to source the reboot script."
+fi
