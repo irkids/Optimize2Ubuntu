@@ -1,8 +1,15 @@
 #!/bin/bash
 
-# Step 1: Ensure proper permissions and ownership for the web directory
+# Ensure proper permissions and ownership
 sudo chown -R www-data:www-data /var/www/html
 sudo chmod -R 755 /var/www/html
+
+# Step 1: Clean the existing directory or backup
+if [ -d "/var/www/html" ]; then
+    echo "Backing up and cleaning existing /var/www/html directory..."
+    sudo mv /var/www/html /var/www/html_backup
+    sudo mkdir /var/www/html
+fi
 
 # Step 2: Install required packages if not installed
 install_if_missing() {
@@ -20,7 +27,7 @@ install_if_missing "nethogs"
 install_if_missing "composer"
 install_if_missing "npm"
 
-# Step 3: Check for Node.js and install version 16 if necessary
+# Step 3: Install Node.js (Version 16)
 if ! node -v | grep -q "v16"; then
     echo "Installing Node.js version 16..."
     curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
@@ -29,21 +36,15 @@ else
     echo "Node.js version 16 is already installed."
 fi
 
-# Step 4: Set up Laravel (if not already set up)
-if [ ! -d "/var/www/html/public" ]; then
-    echo "Setting up Laravel..."
-    cd /var/www/html
-    composer create-project --prefer-dist laravel/laravel .
-    npm install
-else
-    echo "Laravel is already set up."
-fi
-
-# Build the frontend assets
+# Step 4: Set up Laravel project
 cd /var/www/html
+composer create-project --prefer-dist laravel/laravel .
+npm install
+
+# Step 5: Build the frontend
 npm run build
 
-# Step 5: Create the network stats script for SSH users
+# Step 6: Add network stats script
 cat > /var/www/html/app/Scripts/get_network_stats.php << 'EOF'
 <?php
 function get_network_stats($interface = "eth0") {
@@ -55,8 +56,8 @@ function get_network_stats($interface = "eth0") {
     $rx_final = file_get_contents("/sys/class/net/$interface/statistics/rx_bytes");
     $tx_final = file_get_contents("/sys/class/net/$interface/statistics/tx_bytes");
 
-    $rx_speed = ($rx_final - $rx_initial);  // Receive speed in bytes
-    $tx_speed = ($tx_final - $tx_initial);  // Transmit speed in bytes
+    $rx_speed = ($rx_final - $rx_initial);
+    $tx_speed = ($tx_final - $tx_initial);
 
     return [
         'rx_speed' => format_speed($rx_speed),
@@ -77,14 +78,14 @@ header('Content-Type: application/json');
 echo json_encode(get_network_stats());
 EOF
 
-# Step 6: Add API route for Laravel
+# Step 7: Add API route
 cat >> /var/www/html/routes/api.php << 'EOF'
 Route::get('/network-stats', function () {
     return response()->json(shell_exec('php /var/www/html/app/Scripts/get_network_stats.php'));
 });
 EOF
 
-# Step 7: Create the React component to display network stats for each SSH user
+# Step 8: Add React component
 cat > /var/www/html/resources/js/components/NetworkStats.js << 'EOF'
 import React, { useState, useEffect } from 'react';
 
@@ -104,7 +105,7 @@ const NetworkStats = ({ username }) => {
         };
 
         fetchStats();
-        const interval = setInterval(fetchStats, 5000); // Fetch every 5 seconds
+        const interval = setInterval(fetchStats, 5000);
         return () => clearInterval(interval);
     }, []);
 
@@ -122,30 +123,7 @@ const NetworkStats = ({ username }) => {
 export default NetworkStats;
 EOF
 
-# Step 8: Integrate the NetworkStats component into the dashboard
-cat > /var/www/html/resources/js/components/Dashboard.js << 'EOF'
-import React from 'react';
-import NetworkStats from './NetworkStats';
-
-const Dashboard = () => {
-    const onlineUsers = ["user1", "user2"]; // Replace with actual users
-
-    return (
-        <div>
-            {onlineUsers.map((user) => (
-                <div key={user}>
-                    <h2>{user}</h2>
-                    <NetworkStats username={user} />
-                </div>
-            ))}
-        </div>
-    );
-};
-
-export default Dashboard;
-EOF
-
-# Step 9: Build the frontend assets again after adding the new component
+# Step 9: Build the frontend again
 npm run build
 
-echo "Complete setup done with network stats for SSH users!"
+echo "Setup complete with network stats for SSH users!"
