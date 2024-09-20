@@ -21,6 +21,10 @@ sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd 
 
 sudo apt-get install -y redis-server memcached postgresql postgresql-contrib postgresql-client postgresql-server-dev-all
 
+# Update the package list again before installing elasticsearch
+sudo apt-get update
+
+# Install elasticsearch
 sudo apt-get install -y elasticsearch
 
 sudo apt-get install -y rabbitmq-server
