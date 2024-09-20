@@ -15,38 +15,8 @@ sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolv
 sudo resolvconf -u
 
 # Install necessary packages for productivity and optimization
-# Group 1: Networking and monitoring tools
-sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr-tiny nmap tcpdump wireshark netcat iperf3 fping traceroute dnsutils
 
-# Group 2: Web server and PHP
-sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis php-memcached
-
-# Group 3: Database servers
-sudo apt-get install -y redis-server memcached postgresql postgresql-contrib postgresql-client postgresql-server-dev-all
-
-# Group 4: Search and analytics engines
-sudo apt-get install -y elasticsearch
-
-# Group 5: Messaging and queueings
-sudo apt-get install -y rabbitmq-server
-
-# Group 6: Containerization and orchestrations
-sudo apt-get install -y docker.io docker-compose
-
-# Group 7: Configuration management and provisioning
-sudo apt-get install -y ansible
-
-# Group 8: Cloud services
-sudo apt-get install -y awscli google-cloud-sdk
-
-# Group 9: Kubernetes
-sudo apt-get install -y kubectl
-
-# Group 10: Virtualization and automations
-sudo apt-get install -y qemu-kvm libvirt-bin virt-manager virt-viewer qemu-system libosinfo-bin
-
-# Install additional tools for connection quality and speed
-sudo apt-get install -y speedtest-cli
+sudo apt-get update
 
 # Remove Ubuntu 20.04 repository
 sudo sed -i '/focal/d' /etc/apt/sources.list
