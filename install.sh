@@ -1,32 +1,30 @@
 #!/bin/bash
+set -e
 
-# Change the DNS of the server to Google DNS
-sudo cp /etc/resolv.conf /etc/resolv.conf.backup
-echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
-echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+# Add Ubuntu 20.04 repository
+sudo sh -c 'echo "deb http://archive.ubuntu.com/ubuntu focal main universe" >> /etc/apt/sources.list'
 
 # Update the package list
-sudo apt-get update
+sudo apt update
 
 # Upgrade installed packages
 sudo apt-get dist-upgrade -y
 
 # Install necessary packages for productivity and optimization
-
 # Group 1: Networking and monitoring tools
-sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr nmap tcpdump wireshark netcat iperf3 fping traceroute dnsutils
+sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr-tiny nmap tcpdump wireshark netcat iperf3 fping traceroute dnsutils
 
 # Group 2: Web server and PHP
-sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis php-memcached php-xdebug php-apcu php-pear php-dev php-fpm
+sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis php-memcached
 
 # Group 3: Database servers
-sudo apt-get install -y redis-server memcached mongodb postgresql postgresql-contrib postgresql-client postgresql-server-dev-all
+sudo apt-get install -y redis-server memcached postgresql postgresql-contrib postgresql-client postgresql-server-dev-all
 
-# Group 4: Search and analytics engine
+# Group 4: Search and analytics engines
 sudo apt-get install -y elasticsearch
 
 # Group 5: Messaging and queueing
-sudo apt-get install -y rabbitmq-server zookeeper
+sudo apt-get install -y rabbitmq-server
 
 # Group 6: Containerization and orchestration
 sudo apt-get install -y docker.io docker-compose
@@ -41,7 +39,16 @@ sudo apt-get install -y awscli google-cloud-sdk
 sudo apt-get install -y kubectl
 
 # Group 10: Virtualization and automation
-sudo apt-get install -y minikube virtualbox vagrant libvirt-bin qemu-kvm libvirt-daemon-system libvirt-clients virt-manager virt-viewer qemu-system libosinfo-bin libvirt-dev libvirt-doc libvirt-utils libvirt-python libvirt-python3 python-libvirt python3-libvirt
+sudo apt-get install -y qemu-kvm libvirt-bin virt-manager virt-viewer qemu-system libosinfo-bin
+
+# Install additional tools for connection quality and speed
+sudo apt-get install -y speedtest-cli
+
+# Remove Ubuntu 20.04 repository
+sudo sed -i '/focal/d' /etc/apt/sources.list
+
+# Update the package list again
+sudo apt update
 
 # Confirm or cancel the reboot
 while true; do
