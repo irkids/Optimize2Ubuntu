@@ -11,7 +11,7 @@ sudo apt-get update
 sudo apt-get dist-upgrade -y
 
 # Change DNS server to Google DNS
-sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolvconf
+sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolv.conf
 sudo resolvconf -u
 
 # Install necessary packages for productivity and optimization
@@ -27,10 +27,10 @@ sudo apt-get install -y redis-server memcached postgresql postgresql-contrib pos
 # Group 4: Search and analytics engines
 sudo apt-get install -y elasticsearch
 
-# Group 5: Messaging and queueing
+# Group 5: Messaging and queueings
 sudo apt-get install -y rabbitmq-server
 
-# Group 6: Containerization and orchestration
+# Group 6: Containerization and orchestrations
 sudo apt-get install -y docker.io docker-compose
 
 # Group 7: Configuration management and provisioning
@@ -42,7 +42,7 @@ sudo apt-get install -y awscli google-cloud-sdk
 # Group 9: Kubernetes
 sudo apt-get install -y kubectl
 
-# Group 10: Virtualization and automation
+# Group 10: Virtualization and automations
 sudo apt-get install -y qemu-kvm libvirt-bin virt-manager virt-viewer qemu-system libosinfo-bin
 
 # Install additional tools for connection quality and speed
