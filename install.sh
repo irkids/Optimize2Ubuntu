@@ -1,28 +1,43 @@
 #!/bin/bash
 set -e
 
-# Add Ubuntu 20.04 repository
-sudo sh -c 'echo "deb http://archive.ubuntu.com/ubuntu focal main universe" >> /etc/apt/sources.list'
+# Check if running on Ubuntu 22.04 or higher
+source /etc/os-release
+if [[ "$VERSION_ID" != "22.04" ]]; then
+  echo "This script is intended for Ubuntu 22.04. Detected version: $VERSION_ID"
+  exit 1
+fi
 
-# Update the package list
+# Update package list and upgrade installed packages
 sudo apt-get update
-
-# Upgrade installed packages
 sudo apt-get dist-upgrade -y
 
-# Change DNS server to Google DNS
+# Install necessary tools for Ubuntu Server 22.04
+sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr-tiny nmap tcpdump wireshark netcat iperf3 fping traceroute bind9-utils resolvconf
+
+# Install web server and PHP
+sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis memcached
+
+# Install database servers
+sudo apt-get install -y redis-server postgresql postgresql-contrib postgresql-client
+
+# Install Docker and other container tools
+sudo apt-get install -y docker.io docker-compose
+
+# Install Ansible and cloud tools
+sudo apt-get install -y ansible awscli
+
+# Install Kubernetes tools
+sudo apt-get install -y kubectl
+
+# Install virtualization tools (libvirt-bin is now part of libvirt-daemon-system)
+sudo apt-get install -y qemu-kvm virt-manager virt-viewer qemu-system libvirt-daemon-system libvirt-clients
+
+# Install additional tools for connection quality and speed
+sudo apt-get install -y speedtest-cli
+
+# Update DNS server to use Google DNS
 sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolv.conf
-sudo resolvconf -u
-
-# Install necessary packages for productivity and optimization
-
-sudo apt-get update
-
-# Remove Ubuntu 20.04 repository
-sudo sed -i '/focal/d' /etc/apt/sources.list
-
-# Update the package list again
-sudo apt update
 
 # Confirm or cancel the reboot
 while true; do
