@@ -1,43 +1,51 @@
 #!/bin/bash
 set -e
 
-# Check if running on Ubuntu 22.04 or higher
-source /etc/os-release
-if [[ "$VERSION_ID" != "22.04" ]]; then
-  echo "This script is intended for Ubuntu 22.04. Detected version: $VERSION_ID"
-  exit 1
-fi
+# Add Ubuntu 20.04 repository
+sudo sh -c 'echo "deb http://archive.ubuntu.com/ubuntu focal main universe" >> /etc/apt/sources.list'
 
-# Update package list and upgrade installed packages
+# Update the package list
 sudo apt-get update
+
+# Upgrade installed packages
 sudo apt-get dist-upgrade -y
 
-# Install necessary tools for Ubuntu Server 22.04
-sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr-tiny nmap tcpdump wireshark netcat iperf3 fping traceroute bind9-utils resolvconf
+# Change DNS server to Google DNS
+sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolv.conf
+sudo resolvconf -u
 
-# Install web server and PHP
-sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis memcached
+# Install necessary packages for productivity and optimization
+sudo apt-get install -y jq socat nano htop nload iftop iotop glances nethogs vnstat mtr-tiny nmap tcpdump wireshark netcat iperf3 fping traceroute dnsutils
 
-# Install database servers
-sudo apt-get install -y redis-server postgresql postgresql-contrib postgresql-client
+sudo apt-get install -y apache2 php libapache2-mod-php php-mysql php-cli php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-soap php-curl php-imagick php-redis php-memcached
 
-# Install Docker and other container tools
+sudo apt-get install -y redis-server memcached postgresql postgresql-contrib postgresql-client postgresql-server-dev-all
+
+sudo apt-get install -y elasticsearch
+
+sudo apt-get install -y rabbitmq-server
+
 sudo apt-get install -y docker.io docker-compose
 
-# Install Ansible and cloud tools
-sudo apt-get install -y ansible awscli
+sudo apt-get install -y ansible
 
-# Install Kubernetes tools
+sudo apt-get install -y awscli google-cloud-sdk
+
+# Update the package list again before installing kubectl
+sudo apt-get update
+
+# Install kubectl
 sudo apt-get install -y kubectl
 
-# Install virtualization tools (libvirt-bin is now part of libvirt-daemon-system)
-sudo apt-get install -y qemu-kvm virt-manager virt-viewer qemu-system libvirt-daemon-system libvirt-clients
+sudo apt-get install -y qemu-kvm libvirt-bin virt-manager virt-viewer qemu-system libosinfo-bin
 
-# Install additional tools for connection quality and speed
 sudo apt-get install -y speedtest-cli
 
-# Update DNS server to use Google DNS
-sudo sed -i 's/nameserver.*/nameserver 8.8.8.8\nnameserver 8.8.4.4/' /etc/resolv.conf
+# Remove Ubuntu 20.04 repository
+sudo sed -i '/focal/d' /etc/apt/sources.list
+
+# Update the package list again
+sudo apt update
 
 # Confirm or cancel the reboot
 while true; do
