@@ -6,7 +6,7 @@
 #### Only For Debian Base (Ubuntu & Debian)
    
 ```
-apt install curl -y && bash <(curl -Ls https://raw.githubusercontent.com/irkids/Optimize2Ubuntu.sh/main/Optimize2Ubuntu.sh --ipv4)
+apt install curl -y && bash <(curl -Ls https://raw.githubusercontent.com/irkids/Optimize2Ubuntu/main/Optimize2Ubuntu.sh --ipv4)
 ```
 
 ---------------------------------------------------------------------------------------------------------------------------------------
