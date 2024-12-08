@@ -119,8 +119,7 @@ EOL
     rm -rf "$temp_dir"
 }
 
-# Go Installation with Secure Verification
-install_go() {
+# Go Installation with Secure Verificationinstall_go() {
     local go_version="1.21.6"
     local go_arch="linux-amd64"
     local go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
@@ -130,11 +129,21 @@ install_go() {
     local temp_dir=$(mktemp -d)
     cd "$temp_dir"
 
-    wget "$go_url"
-    wget "$go_checksum_url"
+    wget "$go_url" -O go.tar.gz
+    wget "$go_checksum_url" -O go.sha256
 
-    # Verify download integrity
-    if ! sha256sum -c <(awk '{print $1, " go'${go_version}.${go_arch}.tar.gz'"}' go${go_version}.${go_arch}.tar.gz.sha256); then
+    # Print downloaded checksum for debugging
+    echo "Downloaded checksum:"
+    cat go.sha256
+
+    # Alternative checksum verification method
+    local expected_checksum=$(cat go.sha256)
+    local downloaded_checksum=$(sha256sum go.tar.gz | awk '{print $1}')
+
+    echo "Expected checksum: $expected_checksum"
+    echo "Downloaded file checksum: $downloaded_checksum"
+
+    if [[ "$expected_checksum" != "$downloaded_checksum" ]]; then
         log "ERROR" "Go download checksum verification failed"
         return 1
     fi
@@ -143,7 +152,7 @@ install_go() {
     rm -rf /usr/local/go
 
     # Install Go
-    tar -C /usr/local -xzf go${go_version}.${go_arch}.tar.gz
+    tar -C /usr/local -xzf go.tar.gz
 
     # Set up environment
     mkdir -p /usr/local/go/workspace
