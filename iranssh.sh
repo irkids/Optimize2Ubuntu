@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Prerequisites and Dependency Installation Script
+# Supports Ubuntu/Debian and CentOS/RHEL
+
 # Strict error handling
 set -euo pipefail
 
@@ -15,46 +18,98 @@ log() {
     printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" | tee -a "$LOG_FILE"
 }
 
-# Centralized package management
-install_packages() {
-    local packages=("$@")
+# Detect package manager and OS
+detect_package_manager() {
     if command -v apt-get &> /dev/null; then
-        DEBIAN_FRONTEND=noninteractive apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+        echo "apt"
     elif command -v yum &> /dev/null; then
-        yum install -y "${packages[@]}"
+        echo "yum"
     else
         log "ERROR" "Unsupported package manager"
         return 1
     fi
 }
 
-# Secure certificate generation
-generate_certificate() {
-    local domain="$1"
+# Centralized package management
+install_packages() {
+    local package_manager
+    package_manager=$(detect_package_manager)
+    local packages=("$@")
+
+    if [ "$package_manager" == "apt" ]; then
+        DEBIAN_FRONTEND=noninteractive apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+    elif [ "$package_manager" == "yum" ]; then
+        yum install -y "${packages[@]}"
+    fi
+}
+
+# Install Go with version management
+install_go() {
+    local go_version="1.21.5"
+    local go_arch="linux-amd64"
+    local go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
+    
+    # Remove existing Go installation if exists
+    rm -rf /usr/local/go
+
+    # Download and install Go
+    curl -L "$go_url" | tar -C /usr/local -xzf -
+    
+    # Update PATH and environment
+    export PATH="/usr/local/go/bin:$PATH"
+    
+    # Verify Go installation
+    go version
+    
+    log "INFO" "Go $go_version installed successfully"
+}
+
+# Install Gorilla WebSocket library
+install_websocket_library() {
+    mkdir -p "$GOPATH/src/github.com/gorilla"
+    cd "$GOPATH/src/github.com/gorilla"
+    
+    # Clone Gorilla WebSocket library
+    git clone https://github.com/gorilla/websocket.git
+    
+    # Verify library installation
+    cd websocket
+    go mod init
+    go mod tidy
+    
+    log "INFO" "Gorilla WebSocket library installed"
+}
+
+# Secure certificate generation (self-signed for simplicity)
+generate_self_signed_certificate() {
     local cert_dir="/etc/ssl/private"
     
-    # Ensure certbot is installed
-    install_packages "certbot"
+    # Ensure OpenSSL is installed
+    install_packages "openssl"
     
-    # Use Certbot for Let's Encrypt certificates
-    certbot certonly --standalone -d "$domain" --non-interactive --agree-tos --register-unsafely-without-email
-    
-    # Symlink generated certificates
+    # Create directory if not exists
     mkdir -p "$cert_dir"
-    ln -sf "/etc/letsencrypt/live/$domain/fullchain.pem" "$cert_dir/server.crt"
-    ln -sf "/etc/letsencrypt/live/$domain/privkey.pem" "$cert_dir/server.key"
     
+    # Generate self-signed certificate
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "$cert_dir/server.key" \
+        -out "$cert_dir/server.crt" \
+        -subj "/C=US/ST=NetworkSecurity/L=SSHEnhanced/O=LocalDevelopment/CN=localhost"
+    
+    # Set proper permissions
     chmod 600 "$cert_dir/server.key"
-    log "INFO" "Certificates generated for $domain"
+    
+    log "INFO" "Self-signed certificates generated"
 }
 
 # Optimized WebSocket proxy (Go implementation)
 create_websocket_proxy() {
     # Ensure Go is installed
-    install_packages "golang"
-
-    cat > /usr/local/bin/ssh_websocket_proxy.go << 'EOL'
+    export GOPATH="${GOPATH:-/usr/local/go/workspace}"
+    mkdir -p "$GOPATH"
+    
+    cat > "$GOPATH/ssh_websocket_proxy.go" << 'EOL'
 package main
 
 import (
@@ -141,12 +196,12 @@ func main() {
 EOL
 
     # Prepare Go modules
-    cd /usr/local/bin
+    cd "$GOPATH"
     go mod init ssh_websocket_proxy
     go get github.com/gorilla/websocket
 
     # Compile Go WebSocket proxy
-    go build -o /usr/local/bin/ssh_websocket_proxy ssh_websocket_proxy.go
+    go build -o /usr/local/bin/ssh_websocket_proxy "$GOPATH/ssh_websocket_proxy.go"
     log "INFO" "WebSocket proxy compiled"
 }
 
@@ -176,7 +231,6 @@ AuthorizedKeysFile .ssh/authorized_keys
 # Additional security
 MaxAuthTries 3
 LoginGraceTime 30
-AllowUsers ${ALLOWED_SSH_USERS:-}
 
 # Logging
 LogLevel VERBOSE
@@ -225,35 +279,38 @@ EOL
     log "INFO" "Monitoring and logging setup complete"
 }
 
-# Main setup function
-main() {
-    # Check if domain is provided
-    if [ $# -eq 0 ]; then
-        log "ERROR" "Domain argument is required"
-        echo "Usage: $0 <domain>"
-        exit 1
-    fi
-
-    local domain="$1"
-
-    # Essential packages
-    local base_packages=(
-        "openssh-server" "fail2ban" "ufw"
-        "prometheus" "node-exporter" "certbot"
-        "golang" "golang-go"
-    )
-
+# Prerequisites installation function
+install_prerequisites() {
     # Ensure script is run with root privileges
     if [[ $EUID -ne 0 ]]; then
         log "ERROR" "This script must be run as root"
         exit 1
     fi
 
-    # Update package list and install base packages
+    # Essential packages
+    local base_packages=(
+        "openssh-server" "fail2ban" "ufw"
+        "prometheus" "node-exporter"
+        "git" "curl" "wget"
+    )
+
+    # Install base packages
     install_packages "${base_packages[@]}"
     
-    # Generate secure certificates
-    generate_certificate "$domain"
+    # Install Go
+    install_go
+    
+    # Install Gorilla WebSocket library
+    install_websocket_library
+    
+    # Generate self-signed certificates
+    generate_self_signed_certificate
+}
+
+# Main setup function
+main() {
+    # Install prerequisites
+    install_prerequisites
     
     # Create optimized WebSocket proxy
     create_websocket_proxy
@@ -264,8 +321,8 @@ main() {
     # Set up monitoring and logging
     setup_monitoring
     
-    log "INFO" "SSH Enhanced Setup Complete for $domain"
+    log "INFO" "SSH Enhanced Setup Complete"
 }
 
 # Execute main function
-main "$@"
+main
