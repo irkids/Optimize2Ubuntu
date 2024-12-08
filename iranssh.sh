@@ -121,27 +121,32 @@ EOL
 
 # Go Installation with Secure Verification
 install_go() {
-    # Define variables without 'local' keyword
+    # Go version and download details
     go_version="1.21.6"
     go_arch="linux-amd64"
-    go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
-    go_checksum_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz.sha256"
+    go_url="https://go.dev/dl/go${go_version}.${go_arch}.tar.gz"
+
+    # Hardcoded checksum for verification (update this with the correct checksum)
+    expected_checksum="3216be81c76f5a35d5290a132b6f1f9ce6d3024857be92d6b etcf6e8c2f6e8c2f69a50a78e75aed85a46a6"
 
     # Create a temporary directory
     temp_dir=$(mktemp -d)
     cd "$temp_dir"
 
-    # Download Go tarball and checksum
+    # Download Go tarball
     wget "$go_url" -O go.tar.gz
-    wget "$go_checksum_url" -O go.sha256
 
     # Verify checksum
-    expected_checksum=$(cat go.sha256)
     downloaded_checksum=$(sha256sum go.tar.gz | awk '{print $1}')
+
+    echo "Expected checksum: $expected_checksum"
+    echo "Downloaded checksum: $downloaded_checksum"
 
     # Compare checksums
     if [ "$expected_checksum" != "$downloaded_checksum" ]; then
         log "ERROR" "Go download checksum verification failed"
+        log "ERROR" "Expected: $expected_checksum"
+        log "ERROR" "Got: $downloaded_checksum"
         return 1
     fi
 
