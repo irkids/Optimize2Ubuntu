@@ -119,7 +119,8 @@ EOL
     rm -rf "$temp_dir"
 }
 
-# Go Installation with Secure Verificationinstall_go() {
+# Go Installation with Secure Verification
+install_go() {
     local go_version="1.21.6"
     local go_arch="linux-amd64"
     local go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
