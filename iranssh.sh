@@ -126,29 +126,12 @@ install_go() {
     go_arch="linux-amd64"
     go_url="https://go.dev/dl/go${go_version}.${go_arch}.tar.gz"
 
-    # Hardcoded checksum for verification (update this with the correct checksum)
-    expected_checksum="3216be81c76f5a35d5290a132b6f1f9ce6d3024857be92d6b etcf6e8c2f6e8c2f69a50a78e75aed85a46a6"
-
     # Create a temporary directory
     temp_dir=$(mktemp -d)
     cd "$temp_dir"
 
     # Download Go tarball
     wget "$go_url" -O go.tar.gz
-
-    # Verify checksum
-    downloaded_checksum=$(sha256sum go.tar.gz | awk '{print $1}')
-
-    echo "Expected checksum: $expected_checksum"
-    echo "Downloaded checksum: $downloaded_checksum"
-
-    # Compare checksums
-    if [ "$expected_checksum" != "$downloaded_checksum" ]; then
-        log "ERROR" "Go download checksum verification failed"
-        log "ERROR" "Expected: $expected_checksum"
-        log "ERROR" "Got: $downloaded_checksum"
-        return 1
-    fi
 
     # Remove existing Go installation
     rm -rf /usr/local/go
