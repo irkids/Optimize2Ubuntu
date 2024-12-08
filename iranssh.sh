@@ -121,30 +121,26 @@ EOL
 
 # Go Installation with Secure Verification
 install_go() {
-    local go_version="1.21.6"
-    local go_arch="linux-amd64"
-    local go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
-    local go_checksum_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz.sha256"
+    # Define variables without 'local' keyword
+    go_version="1.21.6"
+    go_arch="linux-amd64"
+    go_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz"
+    go_checksum_url="https://golang.org/dl/go${go_version}.${go_arch}.tar.gz.sha256"
 
-    # Download and verify checksum
-    local temp_dir=$(mktemp -d)
+    # Create a temporary directory
+    temp_dir=$(mktemp -d)
     cd "$temp_dir"
 
+    # Download Go tarball and checksum
     wget "$go_url" -O go.tar.gz
     wget "$go_checksum_url" -O go.sha256
 
-    # Print downloaded checksum for debugging
-    echo "Downloaded checksum:"
-    cat go.sha256
+    # Verify checksum
+    expected_checksum=$(cat go.sha256)
+    downloaded_checksum=$(sha256sum go.tar.gz | awk '{print $1}')
 
-    # Alternative checksum verification method
-    local expected_checksum=$(cat go.sha256)
-    local downloaded_checksum=$(sha256sum go.tar.gz | awk '{print $1}')
-
-    echo "Expected checksum: $expected_checksum"
-    echo "Downloaded file checksum: $downloaded_checksum"
-
-    if [[ "$expected_checksum" != "$downloaded_checksum" ]]; then
+    # Compare checksums
+    if [ "$expected_checksum" != "$downloaded_checksum" ]; then
         log "ERROR" "Go download checksum verification failed"
         return 1
     fi
