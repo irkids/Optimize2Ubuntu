@@ -1,44 +1,52 @@
 #!/usr/bin/env bash
+
+# Strict error handling
 set -euo pipefail
 
-# Ultra-Advanced SSH Server Configuration
+# Global configurations
+readonly CONFIG_DIR="/etc/ssh_enhanced"
+readonly LOG_FILE="/var/log/ssh_enhanced.log"
+readonly METRICS_DIR="/var/lib/ssh_metrics"
 
-# Global Configuration
-readonly CONFIG_DIR="/etc/ssh_advanced"
-readonly LOG_DIR="/var/log/ssh_advanced"
-readonly BACKUP_DIR="/var/backups/ssh"
-
-# Logging Function
-log() { printf "[%s] %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG_DIR/setup.log"; }
-
-# Error Handling
-trap 'handle_error $? $LINENO' ERR
-
-handle_error() {
-    local exit_code=$1 line_number=$2
-    log "ERROR: Command failed with code $exit_code at line $line_number"
-    notify_admin "SSH Server Configuration Error" "Failure at line $line_number"
+# Logging function with enhanced formatting
+log() {
+    local level="${1^^}"
+    local message="$2"
+    printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" | tee -a "$LOG_FILE"
 }
 
-# Lightweight Package Management
+# Centralized package management
 install_packages() {
     local packages=("$@")
-    [[ -x "$(command -v apt-get)" ]] && apt-get update && apt-get install -y "${packages[@]}"
-    [[ -x "$(command -v yum)" ]] && yum install -y "${packages[@]}"
+    if command -v apt-get &> /dev/null; then
+        DEBIAN_FRONTEND=noninteractive apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+    elif command -v yum &> /dev/null; then
+        yum install -y "${packages[@]}"
+    else
+        log "ERROR" "Unsupported package manager"
+        return 1
+    fi
 }
 
-# Secure Certificate Generation
-generate_cert() {
-    local domain=$1
-    openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
-        -keyout "$CONFIG_DIR/server.key" \
-        -out "$CONFIG_DIR/server.crt" \
-        -subj "/CN=$domain"
+# Secure certificate generation
+generate_certificate() {
+    local domain="$1"
+    local cert_dir="/etc/ssl/private"
+    
+    # Use Certbot for Let's Encrypt certificates
+    certbot certonly --standalone -d "$domain"
+    
+    # Symlink generated certificates
+    ln -sf "/etc/letsencrypt/live/$domain/fullchain.pem" "$cert_dir/server.crt"
+    ln -sf "/etc/letsencrypt/live/$domain/privkey.pem" "$cert_dir/server.key"
+    
+    chmod 600 "$cert_dir/server.key"
 }
 
-# WebSocket Proxy (Golang Implementation)
+# Optimized WebSocket proxy (Go implementation)
 create_websocket_proxy() {
-    cat > /usr/local/bin/ws_proxy.go <<'EOG'
+    cat > /usr/local/bin/ssh_websocket_proxy.go << 'EOL'
 package main
 
 import (
@@ -67,13 +75,13 @@ func proxySSH(ws *websocket.Conn, sshConn net.Conn) {
 
     go func() {
         defer wg.Done()
-        buf := make([]byte, 4096)
+        buffer := make([]byte, 4096)
         for {
-            n, err := sshConn.Read(buf)
+            n, err := sshConn.Read(buffer)
             if err != nil {
                 break
             }
-            ws.WriteMessage(websocket.BinaryMessage, buf[:n])
+            ws.WriteMessage(websocket.BinaryMessage, buffer[:n])
         }
     }()
 
@@ -81,45 +89,61 @@ func proxySSH(ws *websocket.Conn, sshConn net.Conn) {
 }
 
 func main() {
-    // Implementation details
+    upgrader := websocket.Upgrader{
+        ReadBufferSize:  4096,
+        WriteBufferSize: 4096,
+    }
+
+    http.HandleFunc("/ssh", func(w http.ResponseWriter, r *http.Request) {
+        ws, err := upgrader.Upgrade(w, r, nil)
+        if err != nil {
+            log.Println(err)
+            return
+        }
+        defer ws.Close()
+
+        sshConn, err := net.Dial("tcp", "127.0.0.1:22")
+        if err != nil {
+            log.Println(err)
+            return
+        }
+        defer sshConn.Close()
+
+        proxySSH(ws, sshConn)
+    })
+
+    log.Fatal(http.ListenAndServeTLS(":8080", "/etc/ssl/private/server.crt", "/etc/ssl/private/server.key", nil))
 }
-EOG
+EOL
+
+    # Compile Go WebSocket proxy
+    go build /usr/local/bin/ssh_websocket_proxy.go
 }
 
-# Unified Monitoring and Metrics
-setup_monitoring() {
-    install_packages prometheus node_exporter
-    cat > /etc/prometheus/prometheus.yml <<'EOF'
-global:
-  scrape_interval: 15s
-scrape_configs:
-  - job_name: 'ssh_metrics'
-    static_configs:
-      - targets: ['localhost:9100']
-EOF
-}
-
-# Main Execution
+# Main setup function
 main() {
-    mkdir -p "$CONFIG_DIR" "$LOG_DIR" "$BACKUP_DIR"
+    local domain="$1"
+
+    # Essential packages
+    local base_packages=(
+        "openssh-server" "fail2ban" "ufw"
+        "prometheus" "node-exporter" "certbot"
+    )
+
+    install_packages "${base_packages[@]}"
     
-    log "Starting Advanced SSH Configuration"
+    # Generate secure certificates
+    generate_certificate "$domain"
     
-    install_packages openssh-server fail2ban ufw nginx
-    
-    generate_cert "$(hostname -f)"
+    # Create optimized WebSocket proxy
     create_websocket_proxy
+    
+    # Configure SSH with enhanced security
+    configure_ssh
+    
+    # Set up monitoring and logging
     setup_monitoring
-    
-    # SSH Hardening
-    sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-    
-    systemctl restart sshd
-    
-    log "SSH Configuration Completed Successfully"
 }
 
+# Execute main function
 main "$@"
-exit 0
-EOG
