@@ -441,13 +441,35 @@ configure_firewall() {
     log "INFO" "Firewall configured with strict rules"
 }
 
+# Generate Self-Signed Certificate Function
+generate_self_signed_certificate() {
+    local cert_dir="/etc/ssl/private"
+    
+    # Ensure OpenSSL is installed
+    install_packages "openssl"
+    
+    # Create directory if not exists
+    mkdir -p "$cert_dir"
+    
+    # Generate self-signed certificate
+    openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+        -keyout "$cert_dir/server.key" \
+        -out "$cert_dir/server.crt" \
+        -subj "/C=US/ST=NetworkSecurity/L=SSHEnhanced/O=LocalDevelopment/CN=localhost"
+    
+    # Set proper permissions
+    chmod 600 "$cert_dir/server.key"
+    
+    log "INFO" "Self-signed certificates generated"
+}
+
 # Main Installation Function
 main() {
     # Ensure root privileges
     if [[ $EUID -ne 0 ]]; then
         log "ERROR" "This script must be run as root. Use sudo."
         exit 1
-    }
+    fi
 
     # Check Ubuntu Version
     check_ubuntu_version
@@ -462,30 +484,33 @@ main() {
     # Install base packages
     install_packages "${base_packages[@]}"
 
-# Create configuration and metrics directories
-mkdir -p "$CONFIG_DIR"
-mkdir -p "$METRICS_DIR"
+    # Create configuration and metrics directories
+    mkdir -p "$CONFIG_DIR"
+    mkdir -p "$METRICS_DIR"
 
-# Install Node Exporter
-install_node_exporter
+    # Install Node Exporter
+    install_node_exporter
 
-# Install Go
-install_go
+    # Install Go
+    install_go
 
-# Create WebSocket Proxy
-create_websocket_proxy
+    # Generate self-signed certificates
+    generate_self_signed_certificate
 
-# Configure SSH
-configure_ssh
+    # Create WebSocket Proxy
+    create_websocket_proxy
 
-# Setup Prometheus Monitoring
-setup_prometheus
+    # Configure SSH
+    configure_ssh
 
-# Configure Firewall
-configure_firewall
+    # Setup Prometheus Monitoring
+    setup_prometheus
 
-# Log successful completion
-log "INFO" "SSH Enhanced Security Setup Complete (Version ${SCRIPT_VERSION})"
+    # Configure Firewall
+    configure_firewall
+
+    # Log successful completion
+    log "INFO" "SSH Enhanced Security Setup Complete (Version ${SCRIPT_VERSION})"
 }
 
 # Execute the main function
