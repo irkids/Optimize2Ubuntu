@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Ultra-Advanced Script Function Verifier and Installer
-# Version 2.1 - Comprehensive Multi-Language Script Verification Utility
+# Version 2.2 - Comprehensive Multi-Language Script Verification Utility
 
 # Strict error handling and debugging
 set -euo pipefail
@@ -102,7 +102,58 @@ install_language_prerequisites() {
     log_message "INFO" "All language prerequisites installed successfully"
 }
 
-# Rest of the script remains the same as in the previous version...
+# Script Verification Function
+verify_script() {
+    local script_url="$1"
+    local script_language="$2"
+    local download_path="${TEMP_DIR}/downloaded_script.${script_language}"
+
+    log_message "INFO" "Downloading script from $script_url"
+    
+    # Download the script
+    if ! curl -fsSL -o "$download_path" "$script_url"; then
+        error_exit "Failed to download script from $script_url"
+    fi
+
+    log_message "INFO" "Verifying $script_language script syntax"
+
+    # Language-specific verification
+    case "$script_language" in
+        "bash")
+            if ! bash -n "$download_path"; then
+                error_exit "Bash script syntax check failed"
+            fi
+            ;;
+        "python")
+            if ! python3 -m py_compile "$download_path"; then
+                error_exit "Python script syntax check failed"
+            fi
+            ;;
+        "javascript")
+            if ! node -c "$download_path"; then
+                error_exit "JavaScript script syntax check failed"
+            fi
+            ;;
+        "php")
+            if ! php -l "$download_path"; then
+                error_exit "PHP script syntax check failed"
+            fi
+            ;;
+        "perl")
+            if ! perl -c "$download_path"; then
+                error_exit "Perl script syntax check failed"
+            fi
+            ;;
+        *)
+            error_exit "Unsupported script language: $script_language"
+            ;;
+    esac
+
+    log_message "INFO" "Script syntax verification successful"
+    
+    # Optional: Additional security checks can be added here
+    echo -e "${GREEN}Script verification completed successfully!${NC}"
+}
 
 # Main Execution
 main() {
