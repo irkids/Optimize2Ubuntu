@@ -1,239 +1,206 @@
 #!/usr/bin/env bash
 
-# Robust Script Verification Tool
-# Version 2.1 - Enhanced Error Handling and Syntax Correction
+# Robust Bash Verification Script
+# Enhanced error handling and syntax compatibility
 
-# Strict mode with error handling
-set -Eeo pipefail
+# Strict mode with additional error handling
+set -euo pipefail
 
-# Global Configuration
-declare -r SCRIPT_NAME=$(basename "$0")
-declare -r SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Comprehensive error handling function
+handle_error() {
+    local lineno="$1"
+    local command="$2"
+    local exitcode="$3"
+    
+    echo "Error: Command '$command' failed at line $lineno with exit code $exitcode" >&2
+}
 
-# Logging and Configuration
-readonly LOG_DIR="${LOG_DIR:-/var/log/script_verifier}"
-readonly CACHE_DIR="${CACHE_DIR:-/tmp/script_verifier_cache}"
-readonly CONFIG_DIR="${CONFIG_DIR:-/etc/script_verifier}"
+# Trap errors with detailed logging
+trap 'handle_error ${LINENO} "$BASH_COMMAND" $?' ERR
 
-# Color Definitions - Using readonly for immutability
-readonly C_SUCCESS='\033[1;32m'     # Bright Green
-readonly C_ERROR='\033[1;31m'       # Bright Red
-readonly C_WARNING='\033[1;33m'     # Bright Yellow
-readonly C_INFO='\033[1;34m'        # Bright Blue
-readonly C_RESET='\033[0m'          # Reset Color
+# Color Definitions
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly NC='\033[0m' # No Color
 
 # Logging Function
-log_message() {
-    local level="${1^^}"
+log() {
+    local level="$1"
     local message="$2"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    local timestamp
+    timestamp=$(date "+%Y-%m-%d %H:%M:%S")
     
-    # Ensure log directory exists
-    mkdir -p "$LOG_DIR"
-    
-    # Log to file
-    echo "[${timestamp}] [${level}] ${message}" >> "${LOG_DIR}/script_verifier.log"
-    
-    # Conditional console output based on verbosity
     case "$level" in
-        ERROR)
-            echo -e "${C_ERROR}${message}${C_RESET}" >&2
+        "INFO")
+            echo -e "${GREEN}[INFO] ${timestamp}: ${message}${NC}"
             ;;
-        WARNING)
-            echo -e "${C_WARNING}${message}${C_RESET}" >&2
+        "WARNING")
+            echo -e "${YELLOW}[WARNING] ${timestamp}: ${message}${NC}" >&2
             ;;
-        INFO)
-            echo -e "${C_INFO}${message}${C_RESET}"
-            ;;
-        SUCCESS)
-            echo -e "${C_SUCCESS}${message}${C_RESET}"
+        "ERROR")
+            echo -e "${RED}[ERROR] ${timestamp}: ${message}${NC}" >&2
             ;;
         *)
-            echo "${message}"
+            echo -e "[${level}] ${timestamp}: ${message}"
             ;;
     esac
 }
 
-# Error Handler
-error_handler() {
-    local line_number="$1"
-    local command="$2"
-    local exit_code="$3"
-    
-    log_message "ERROR" "Error in ${SCRIPT_NAME} at line ${line_number}: Command '${command}' failed with exit code ${exit_code}"
-    exit "$exit_code"
-}
-
-# Trap errors
-trap 'error_handler ${LINENO} "$BASH_COMMAND" $?' ERR
-
 # Dependency Checker
-check_system_dependencies() {
-    local -a dependencies=(
-        "bash:4.0"
-        "python3:3.6"
-        "node:14.0.0"
-        "npm:6.0.0"
-        "php:7.4"
-        "perl:5.20"
+check_dependencies() {
+    local dependencies=(
         "curl"
         "wget"
         "git"
+        "python3"
+        "node"
+        "npm"
+        "php"
+        "perl"
     )
     
-    log_message "INFO" "Checking System Dependencies..."
+    local missing_deps=()
     
     for dep in "${dependencies[@]}"; do
-        # Split dependency and version
-        IFS=':' read -r name version <<< "$dep"
-        
-        # Check dependency existence
-        if ! command -v "$name" &> /dev/null; then
-            log_message "ERROR" "Dependency not found: ${name}"
-            return 1
-        fi
-        
-        # Version check for those with versions
-        if [[ -n "$version" ]]; then
-            local current_version
-            
-            case "$name" in
-                bash)
-                    current_version=$(bash --version | head -n1 | grep -oP '(\d+\.\d+)')
-                    ;;
-                python3)
-                    current_version=$(python3 --version 2>&1 | grep -oP '(\d+\.\d+)')
-                    ;;
-                node)
-                    current_version=$(node --version | grep -oP 'v(\d+\.\d+)')
-                    current_version="${current_version#v}"
-                    ;;
-                npm)
-                    current_version=$(npm --version)
-                    ;;
-                php)
-                    current_version=$(php --version | head -n1 | grep -oP '(\d+\.\d+)')
-                    ;;
-                perl)
-                    current_version=$(perl --version | grep -oP '(\d+\.\d+)')
-                    ;;
-            esac
-            
-            # Compare versions
-            if [[ "$(printf '%s\n' "$version" "$current_version" | sort -V | head -n1)" != "$version" ]]; then
-                log_message "WARNING" "Dependency ${name} version ${current_version} is lower than required ${version}"
-            fi
+        if ! command -v "$dep" &> /dev/null; then
+            missing_deps+=("$dep")
         fi
     done
     
-    log_message "SUCCESS" "All dependencies checked successfully"
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        log "ERROR" "Missing dependencies: ${missing_deps[*]}"
+        return 1
+    fi
+    
+    log "INFO" "All dependencies are available"
     return 0
 }
 
-# Node.js Library Installer
-install_node_libraries() {
-    log_message "INFO" "Installing Node.js Libraries..."
-    if npm install -g acorn acorn-walk; then
-        log_message "SUCCESS" "Node.js libraries installed successfully"
-    else
-        log_message "ERROR" "Failed to install Node.js libraries"
-        return 1
-    fi
-}
-
-# GitHub Repository Validator
+# Repository Validation Function
 validate_github_repo() {
     local repo_url="$1"
     
-    # Validate GitHub URL format
-    if [[ ! "$repo_url" =~ ^https://github\.com/[a-zA-Z0-9-]+/[a-zA-Z0-9_-]+(/?)$ ]]; then
-        log_message "ERROR" "Invalid GitHub Repository URL format"
+    # Enhanced GitHub URL validation
+    if [[ ! "$repo_url" =~ ^https://github\.com/[a-zA-Z0-9-]+/[a-zA-Z0-9_-]+(/.*)?$ ]]; then
+        log "ERROR" "Invalid GitHub repository URL format"
         return 1
     fi
     
-    # Attempt to clone repository
-    local repo_name
-    repo_name=$(basename "$repo_url")
-    local clone_dir="${CACHE_DIR}/${repo_name}"
-    
-    mkdir -p "$CACHE_DIR"
-    
-    if git clone --depth 1 "$repo_url" "$clone_dir"; then
-        log_message "SUCCESS" "Repository successfully cloned to ${clone_dir}"
-        echo "$clone_dir"
-        return 0
-    else
-        log_message "ERROR" "Failed to clone repository"
+    # Validate repository accessibility
+    if ! git ls-remote "$repo_url" &> /dev/null; then
+        log "ERROR" "Cannot access repository. Check URL or network connectivity."
         return 1
     fi
+    
+    log "INFO" "Repository URL validated successfully"
+    return 0
 }
 
-# Main Execution Function
-main() {
-    # Parse command-line arguments
-    local repo_url=""
-    local language=""
+# Function Extraction
+extract_functions() {
+    local script_path="$1"
+    local language="$2"
     
-    # Argument parsing with more robust handling
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --repo)
-                repo_url="${2:-}"
-                shift 2
-                ;;
-            --language)
-                language="${2:-}"
-                shift 2
-                ;;
-            --ipv4)
-                # Handle potential IPv4 flag (added for compatibility)
-                shift
-                ;;
-            *)
-                log_message "ERROR" "Unknown argument: $1"
-                return 1
-                ;;
-        esac
+    case "$language" in
+        "bash")
+            grep -E '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$script_path" | \
+                sed -E 's/[[:space:]]*([a-zA-Z_][a-zA-Z0-9_]*)\(\).*/\1/'
+            ;;
+        "python")
+            grep -E '^def [a-zA-Z_][a-zA-Z0-9_]*\(' "$script_path" | \
+                sed -E 's/def ([a-zA-Z_][a-zA-Z0-9_]*)\(.*/\1/'
+            ;;
+        "javascript")
+            grep -E '(function[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*\(|[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*function\()' "$script_path" | \
+                sed -E 's/.*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(.*/\1/'
+            ;;
+        "php")
+            grep -E '^(public |private |protected )?function [a-zA-Z_][a-zA-Z0-9_]*\(' "$script_path" | \
+                sed -E 's/.*function ([a-zA-Z_][a-zA-Z0-9_]*)\(.*/\1/'
+            ;;
+        *)
+            log "ERROR" "Unsupported language: $language"
+            return 1
+            ;;
+    esac
+}
+
+# Main Verification Function
+verify_script() {
+    local repo_url="$1"
+    local language="${2:-bash}"
+    
+    # Validate repository
+    if ! validate_github_repo "$repo_url"; then
+        return 1
+    fi
+    
+    # Create temporary directory
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Clone repository
+    if ! git clone --depth 1 "$repo_url" "$temp_dir"; then
+        log "ERROR" "Failed to clone repository"
+        return 1
+    fi
+    
+    # Find script files
+    local script_files
+    mapfile -t script_files < <(find "$temp_dir" -type f -name "*.$language")
+    
+    if [ ${#script_files[@]} -eq 0 ]; then
+        log "ERROR" "No $language scripts found in repository"
+        return 1
+    fi
+    
+    # Verify functions
+    for script in "${script_files[@]}"; do
+        log "INFO" "Analyzing script: $script"
+        
+        # Extract functions
+        local functions
+        mapfile -t functions < <(extract_functions "$script" "$language")
+        
+        if [ ${#functions[@]} -eq 0 ]; then
+            log "WARNING" "No functions found in $script"
+            continue
+        fi
+        
+        log "INFO" "Found ${#functions[@]} functions"
+        
+        # Optional: Add function verification logic here
     done
     
-    # Interactive mode if no arguments provided
-    if [[ -z "$repo_url" ]]; then
-        read -rp "Enter GitHub Repository URL: " repo_url
-    fi
+    # Cleanup
+    rm -rf "$temp_dir"
     
-    # Validate and clone repository
-    local clone_dir
-    clone_dir=$(validate_github_repo "$repo_url") || return 1
-    
-    # Check system dependencies
-    check_system_dependencies || return 1
-    
-    # Install Node.js libraries
-    install_node_libraries || return 1
-    
-    # If language not specified, prompt user
-    if [[ -z "$language" ]]; then
-        PS3="Select Script Language: "
-        local options=("Bash" "Python" "JavaScript" "PHP" "Perl" "Quit")
-        select opt in "${options[@]}"; do
-            case "$opt" in
-                "Quit")
-                    return 0
-                    ;;
-                *)
-                    language="${opt,,}"
-                    break
-                    ;;
-            esac
-        done
-    fi
-    
-    log_message "INFO" "Verification process started for ${language} scripts"
-    # Additional verification logic would go here
+    log "INFO" "Script verification completed"
 }
 
-# Execute main function with all arguments
-main "$@"
+# Main Execution
+main() {
+    # Check dependencies
+    if ! check_dependencies; then
+        log "ERROR" "Dependency check failed"
+        exit 1
+    fi
+    
+    # Ensure at least repository URL is provided
+    if [ $# -lt 1 ]; then
+        log "ERROR" "Usage: $0 <github_repo_url> [language]"
+        exit 1
+    fi
+    
+    local repo_url="$1"
+    local language="${2:-bash}"
+    
+    # Run verification
+    verify_script "$repo_url" "$language"
+}
 
-# Exit with success
-exit 0
+# Only run main if script is being executed, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
