@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
-# Ultra Advanced Script Verification and Installation Tool
-# Supports comprehensive multi-language script analysis and verification
+# Ultra-Advanced Script Function Verifier and Installer
+# Version 2.0 - Comprehensive Multi-Language Script Verification Utility
+
+# Strict error handling and debugging
+set -euo pipefail
+IFS=$'\n\t'
 
 # Color Codes
 GREEN='\033[0;32m'
@@ -10,280 +14,395 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration and Paths
-VERSION="1.3.0"
-CONFIG_DIR="${HOME}/.script-verifier"
-TEMP_DIR="/tmp/script-verifier-$(date +%s)"
-LOG_FILE="${CONFIG_DIR}/verification.log"
-PREREQUISITES_FILE="${CONFIG_DIR}/prerequisites.json"
+# Global Configuration
+SCRIPT_NAME="$(basename "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMP_DIR="/tmp/script_verifier_$(date +%Y%m%d_%H%M%S)"
+CONFIG_FILE="${SCRIPT_DIR}/script_verifier.conf"
+LOG_FILE="${TEMP_DIR}/verification.log"
+DEPENDENCY_LOG="${TEMP_DIR}/dependency_check.log"
 
-# Ensure minimum BASH version
-if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
-    echo -e "${RED}Error: Requires BASH 4.x or higher. Current version: ${BASH_VERSION}${NC}"
+# Logging and Error Handling
+log_message() {
+    local log_level="$1"
+    local message="$2"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [$log_level] $message" | tee -a "$LOG_FILE"
+}
+
+error_exit() {
+    log_message "ERROR" "$1"
+    echo -e "${RED}FATAL ERROR: $1${NC}" >&2
+    cleanup
     exit 1
 }
 
-# Logging Function
-log_message() {
-    local log_level="${1:-INFO}"
-    local message="${2}"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${log_level}] ${message}" | tee -a "${LOG_FILE}"
-}
-
 # Prerequisite Checking and Installation
-check_and_install_prerequisites() {
-    # Install jq if not present
-    if ! command -v jq &> /dev/null; then
-        echo -e "${YELLOW}Installing jq...${NC}"
-        if command -v apt-get &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y jq
-        elif command -v yum &> /dev/null; then
-            sudo yum install -y jq
-        elif command -v brew &> /dev/null; then
-            brew install jq
-        else
-            echo -e "${RED}Cannot install jq. Please install it manually.${NC}"
-            return 1
-        fi
-    fi
-
-    # Create prerequisites configuration if not exists
-    mkdir -p "$(dirname "${PREREQUISITES_FILE}")"
-    if [[ ! -f "${PREREQUISITES_FILE}" ]]; then
-        cat > "${PREREQUISITES_FILE}" << EOL
-{
-    "languages": {
-        "python": {
-            "min_version": "3.7",
-            "install_command": "sudo apt-get install -y python3 python3-pip"
-        },
-        "nodejs": {
-            "min_version": "14.0.0",
-            "install_command": "curl -fsSL https://deb.nodesource.com/setup_14.x | sudo -E bash - && sudo apt-get install -y nodejs",
-            "npm_libraries": ["acorn", "acorn-walk"]
-        },
-        "php": {
-            "min_version": "7.4",
-            "install_command": "sudo apt-get install -y php php-cli"
-        },
-        "perl": {
-            "min_version": "5.26",
-            "install_command": "sudo apt-get install -y perl"
-        }
-    },
-    "tools": {
-        "curl": {
-            "install_command": "sudo apt-get install -y curl"
-        },
-        "wget": {
-            "install_command": "sudo apt-get install -y wget"
-        }
-    }
-}
-EOL
-    fi
-
-    # Prerequisite Checking Function
-    check_prerequisite() {
-        local tool_or_language="$1"
-        local min_version="${2:-}"
-        
-        case "$tool_or_language" in
-            "python")
-                if command -v python3 &> /dev/null; then
-                    local py_version=$(python3 --version | cut -d' ' -f2)
-                    if [[ "$(printf '%s\n' "$min_version" "$py_version" | sort -V | head -n1)" == "$min_version" ]]; then
-                        echo -e "${GREEN}✓ Python ${py_version} installed${NC}"
-                        return 0
-                    fi
-                fi
-                ;;
-            "nodejs")
-                if command -v node &> /dev/null; then
-                    local node_version=$(node --version | sed 's/v//')
-                    if [[ "$(printf '%s\n' "$min_version" "$node_version" | sort -V | head -n1)" == "$min_version" ]]; then
-                        echo -e "${GREEN}✓ Node.js ${node_version} installed${NC}"
-                        # Check npm libraries
-                        npm list acorn acorn-walk &> /dev/null || {
-                            npm install acorn acorn-walk
-                        }
-                        return 0
-                    fi
-                fi
-                ;;
-            "php")
-                if command -v php &> /dev/null; then
-                    local php_version=$(php --version | head -n 1 | cut -d' ' -f2)
-                    if [[ "$(printf '%s\n' "$min_version" "$php_version" | sort -V | head -n1)" == "$min_version" ]]; then
-                        echo -e "${GREEN}✓ PHP ${php_version} installed${NC}"
-                        return 0
-                    fi
-                fi
-                ;;
-            "perl")
-                if command -v perl &> /dev/null; then
-                    local perl_version=$(perl -V | grep 'This is perl' | cut -d' ' -f4)
-                    if [[ "$(printf '%s\n' "$min_version" "$perl_version" | sort -V | head -n1)" == "$min_version" ]]; then
-                        echo -e "${GREEN}✓ Perl ${perl_version} installed${NC}"
-                        return 0
-                    fi
-                fi
-                ;;
-            "curl"|"wget")
-                command -v "$tool_or_language" &> /dev/null
-                return $?
-                ;;
-        esac
-        
-        return 1
-    }
-
-    # Read Prerequisites JSON Safely
-    read_json_value() {
-        local json_file="$1"
-        local query="$2"
-        jq -r "$query" "$json_file" 2>/dev/null
-    }
-
-    # Main Prerequisite Checking and Installation
-    # Languages
-    local language_keys=$(jq -r '.languages | keys[]' "${PREREQUISITES_FILE}" 2>/dev/null)
-    for lang in $language_keys; do
-        min_version=$(jq -r ".languages.${lang}.min_version" "${PREREQUISITES_FILE}" 2>/dev/null)
-        install_command=$(jq -r ".languages.${lang}.install_command" "${PREREQUISITES_FILE}" 2>/dev/null)
-        
-        check_prerequisite "$lang" "$min_version" || {
-            echo -e "${YELLOW}Installing ${lang}...${NC}"
-            eval "$install_command"
-        }
-    done
-
-    # Tools
-    local tool_keys=$(jq -r '.tools | keys[]' "${PREREQUISITES_FILE}" 2>/dev/null)
-    for tool in $tool_keys; do
-        install_command=$(jq -r ".tools.${tool}.install_command" "${PREREQUISITES_FILE}" 2>/dev/null)
-        
-        check_prerequisite "$tool" || {
-            echo -e "${YELLOW}Installing ${tool}...${NC}"
-            eval "$install_command"
-        }
-    done
-}
-
-# Validate GitHub or Raw GitHub URL
-validate_script_url() {
-    local url="$1"
+check_bash_version() {
+    local required_major=4
+    local current_version="${BASH_VERSION%.*}"
     
-    # Regex for GitHub repository or raw content URLs
-    local github_repo_regex='^https?://(www\.)?github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+(\.git)?$'
-    local raw_github_regex='^https?://raw\.githubusercontent\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/.+\.(py|js|php|pl)$'
-    
-    if [[ "$url" =~ $github_repo_regex ]] || [[ "$url" =~ $raw_github_regex ]]; then
-        echo "$url"
-        return 0
+    if (( $(echo "$current_version >= $required_major" | bc -l) )); then
+        log_message "INFO" "Bash version $current_version meets requirements"
     else
-        echo -e "${RED}Invalid GitHub repository or raw script URL${NC}"
-        return 1
+        error_exit "Bash version must be 4.x or higher. Current version: $current_version"
     fi
 }
 
-# Download Script
-download_script() {
-    local url="$1"
-    local output_dir="${TEMP_DIR}/script"
-    
-    mkdir -p "$output_dir"
-    
-    # Detect download method
-    if command -v curl &> /dev/null; then
-        curl -L "$url" -o "${output_dir}/script" 2>/dev/null
-    elif command -v wget &> /dev/null; then
-        wget -O "${output_dir}/script" "$url" 2>/dev/null
-    else
-        echo -e "${RED}Neither curl nor wget available for download${NC}"
-        return 1
+install_language_prerequisites() {
+    log_message "INFO" "Checking and installing language prerequisites..."
+
+    # Python check and installation
+    if ! command -v python3 &> /dev/null; then
+        log_message "WARN" "Python 3 not found. Attempting to install..."
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip || error_exit "Failed to install Python"
     fi
-    
-    # Check download success
-    if [[ -s "${output_dir}/script" ]]; then
-        echo "${output_dir}/script"
-        return 0
-    else
-        echo -e "${RED}Failed to download script${NC}"
-        return 1
+
+    # Node.js and npm check and installation
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        log_message "WARN" "Node.js or npm not found. Attempting to install..."
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        sudo apt-get install -y nodejs || error_exit "Failed to install Node.js"
     fi
+
+    # Install required Node.js libraries
+    npm install acorn acorn-walk || error_exit "Failed to install Node.js libraries"
+
+    # PHP check and installation
+    if ! command -v php &> /dev/null; then
+        log_message "WARN" "PHP not found. Attempting to install..."
+        sudo apt-get install -y php || error_exit "Failed to install PHP"
+    fi
+
+    # Perl check and installation
+    if ! command -v perl &> /dev/null; then
+        log_message "WARN" "Perl not found. Attempting to install..."
+        sudo apt-get install -y perl || error_exit "Failed to install Perl"
+    fi
+
+    # Install curl or wget if not present
+    if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
+        log_message "WARN" "curl and wget not found. Attempting to install curl..."
+        sudo apt-get install -y curl || error_exit "Failed to install curl"
+    fi
+
+    log_message "INFO" "All language prerequisites installed successfully"
 }
 
-# Function Verification (Simplified for this example)
-verify_script_functions() {
+# Advanced Function Extraction and Verification
+extract_functions_advanced() {
     local script_path="$1"
-    local language=$(file -b --mime-type "$script_path" | cut -d'/' -f2)
-    
-    echo -e "${YELLOW}Analyzing script: $script_path${NC}"
-    
+    local language="$2"
+
     case "$language" in
-        "x-python")
-            functions=$(grep -E '^def ' "$script_path" | awk '{print $2}' | cut -d'(' -f1)
+        "bash")
+            bash_function_extractor "$script_path"
             ;;
-        "x-javascript")
-            functions=$(grep -E '(function |=>)' "$script_path" | awk '{print $2}' | cut -d'(' -f1)
+        "python")
+            python_function_extractor "$script_path"
             ;;
-        "x-php")
-            functions=$(grep -E '^(public|private|protected)? function ' "$script_path" | awk '{print $3}' | cut -d'(' -f1)
+        "javascript")
+            javascript_function_extractor "$script_path"
             ;;
-        "x-perl")
-            functions=$(grep -E '^sub ' "$script_path" | awk '{print $2}')
+        "php")
+            php_function_extractor "$script_path"
+            ;;
+        "perl")
+            perl_function_extractor "$script_path"
             ;;
         *)
-            echo -e "${RED}Unsupported language: $language${NC}"
-            return 1
+            error_exit "Unsupported language: $language"
             ;;
     esac
-    
-    echo -e "${YELLOW}Detected Functions:${NC}"
-    for func in $functions; do
-        echo -e "${GREEN}✓ ${func}${NC}"
-    done
 }
 
-# Main Execution
-main() {
-    # Initialize directories
-    mkdir -p "${CONFIG_DIR}"
-    mkdir -p "${TEMP_DIR}"
+bash_function_extractor() {
+    local script_path="$1"
+    grep -E '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$script_path" | \
+        sed -E 's/[[:space:]]*([a-zA-Z_][a-zA-Z0-9_]*)\(\).*/\1/'
+}
 
-    # Check and install prerequisites
-    check_and_install_prerequisites
+python_function_extractor() {
+    local script_path="$1"
+    python3 -c "
+import ast
+import sys
 
-    # Interactive URL input
-    read -p "Enter GitHub repository or raw script URL: " script_url
+def extract_functions(file_path):
+    with open(file_path, 'r') as file:
+        tree = ast.parse(file.read())
+    
+    functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+    print('\n'.join(functions))
 
-    # Validate URL
-    validated_url=$(validate_script_url "$script_url")
-    if [[ $? -ne 0 ]]; then
-        echo -e "${RED}Invalid URL. Exiting.${NC}"
-        exit 1
+extract_functions('$script_path')
+"
+}
+
+javascript_function_extractor() {
+    local script_path="$1"
+    node -e "
+const acorn = require('acorn');
+const walk = require('acorn-walk');
+const fs = require('fs');
+
+const code = fs.readFileSync('$script_path', 'utf8');
+const ast = acorn.parse(code, { ecmaVersion: 2020 });
+
+const functions = new Set();
+walk.simple(ast, {
+    FunctionDeclaration(node) {
+        if (node.id && node.id.name) functions.add(node.id.name);
+    },
+    VariableDeclarator(node) {
+        if (node.id && node.id.type === 'Identifier' && 
+            node.init && node.init.type === 'FunctionExpression') {
+            functions.add(node.id.name);
+        }
+    }
+});
+
+console.log(Array.from(functions).join('\n'));
+"
+}
+
+php_function_extractor() {
+    local script_path="$1"
+    php -r "
+    \$code = file_get_contents('$script_path');
+    preg_match_all('/function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/', \$code, \$matches);
+    echo implode('\n', \$matches[1]);
+"
+}
+
+perl_function_extractor() {
+    local script_path="$1"
+    perl -ne 'print $1 if /^sub\s+([a-zA-Z_][a-zA-Z0-9_]*)/' "$script_path"
+}
+
+# Advanced Verification with Detailed Error Analysis
+verify_function_advanced() {
+    local function_name="$1"
+    local script_path="$2"
+    local language="$3"
+
+    case "$language" in
+        "bash")
+            bash_function_verification "$function_name"
+            ;;
+        "python")
+            python_function_verification "$script_path" "$function_name"
+            ;;
+        "javascript")
+            javascript_function_verification "$script_path" "$function_name"
+            ;;
+        "php")
+            php_function_verification "$script_path" "$function_name"
+            ;;
+        "perl")
+            perl_function_verification "$script_path" "$function_name"
+            ;;
+    esac
+}
+
+bash_function_verification() {
+    local function_name="$1"
+    if declare -f "$function_name" > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
     fi
+}
+
+python_function_verification() {
+    local script_path="$1"
+    local function_name="$2"
+    python3 -c "
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location('script_module', '$script_path')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+if hasattr(module, '$function_name'):
+    sys.exit(0)
+else:
+    sys.exit(1)
+"
+}
+
+javascript_function_verification() {
+    local script_path="$1"
+    local function_name="$2"
+    node -e "
+const fs = require('fs');
+const script = require('$script_path');
+
+if (typeof script['$function_name'] === 'function') {
+    process.exit(0);
+} else {
+    process.exit(1);
+}
+"
+}
+
+php_function_verification() {
+    local script_path="$1"
+    local function_name="$2"
+    php -r "
+include '$script_path';
+if (function_exists('$function_name')) {
+    exit(0);
+} else {
+    exit(1);
+}
+"
+}
+
+perl_function_verification() {
+    local script_path="$1"
+    local function_name="$2"
+    perl -I. -M"$script_path" -e "
+if (defined(&$function_name)) {
+    exit(0);
+} else {
+    exit(1);
+}
+"
+}
+
+# Script Verification Workflow
+verify_script() {
+    local script_url="$1"
+    local language="$2"
 
     # Download script
-    downloaded_script=$(download_script "$validated_url")
-    if [[ $? -ne 0 ]]; then
-        echo -e "${RED}Script download failed. Exiting.${NC}"
-        exit 1
-    fi
+    local script_path="${TEMP_DIR}/source_script.${language}"
+    download_script "$script_url" "$script_path"
 
-    # Verify script functions
-    verify_script_functions "$downloaded_script"
+    # Verify file permissions
+    verify_file_permissions "$script_path"
+
+    # Extract functions
+    local functions=()
+    mapfile -t functions < <(extract_functions_advanced "$script_path" "$language")
+
+    # Results tracking
+    local total_functions=${#functions[@]}
+    local verified_functions=0
+    local failed_functions=0
+
+    # Function verification
+    for func in "${functions[@]}"; do
+        if verify_function_advanced "$func" "$script_path" "$language"; then
+            echo -e "${GREEN}✓ Function '$func' verified successfully${NC}"
+            ((verified_functions++))
+        else
+            echo -e "${RED}✗ Function '$func' verification failed${NC}"
+            ((failed_functions++))
+            
+            # Detailed failure analysis
+            analyze_function_failure "$func" "$script_path" "$language"
+        fi
+    done
+
+    # Final summary
+    echo -e "\n${BLUE}Verification Summary${NC}"
+    echo -e "Total Functions: $total_functions"
+    echo -e "Verified Functions: $verified_functions"
+    echo -e "Failed Functions: $failed_functions"
 }
 
-# Run main
-main "$@"
+download_script() {
+    local script_url="$1"
+    local script_path="$2"
 
-# Cleanup
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$script_url" -o "$script_path"
+    elif command -v wget &> /dev/null; then
+        wget -q "$script_url" -O "$script_path"
+    else
+        error_exit "Neither curl nor wget available for script download"
+    fi
+
+    if [[ ! -s "$script_path" ]]; then
+        error_exit "Failed to download script from $script_url"
+    fi
+}
+
+verify_file_permissions() {
+    local script_path="$1"
+    local permissions
+    permissions=$(stat -c "%a" "$script_path")
+
+    if [[ "$permissions" =~ ^[0-7]{3}$ ]]; then
+        log_message "INFO" "File permissions: $permissions"
+    else
+        error_exit "Invalid file permissions detected"
+    fi
+}
+
+analyze_function_failure() {
+    local function_name="$1"
+    local script_path="$2"
+    local language="$3"
+
+    log_message "WARN" "Analyzing failure for function: $function_name"
+    
+    # Advanced failure detection strategies
+    case "$language" in
+        "python")
+            python3 -m py_compile "$script_path" || log_message "ERROR" "Python syntax error in script"
+            ;;
+        "javascript")
+            node --check "$script_path" || log_message "ERROR" "JavaScript syntax error in script"
+            ;;
+        "php")
+            php -l "$script_path" || log_message "ERROR" "PHP syntax error in script"
+            ;;
+        "perl")
+            perl -c "$script_path" || log_message "ERROR" "Perl syntax error in script"
+            ;;
+    esac
+}
+
+# Cleanup Function
 cleanup() {
-    rm -rf "${TEMP_DIR}"
+    [[ -d "$TEMP_DIR" ]] && rm -rf "$TEMP_DIR"
 }
 trap cleanup EXIT
 
-exit 0
+# Main Execution
+main() {
+    # Ensure root/sudo capabilities for system-wide installations
+    [[ $EUID -ne 0 ]] && error_exit "This script must be run with sudo/root privileges"
+
+    # Check bash version
+    check_bash_version
+
+    # Install prerequisites
+    install_language_prerequisites
+
+    # Interactive script verification
+    echo -e "${YELLOW}Ultra-Advanced Script Function Verifier${NC}"
+    read -p "Enter GitHub RAW script URL: " script_url
+    
+    PS3="Select script language: "
+    options=("Bash" "Python" "JavaScript" "PHP" "Perl" "Quit")
+    select opt in "${options[@]}"
+    do
+        case $opt in
+            "Bash") verify_script "$script_url" "bash"; break ;;
+            "Python") verify_script "$script_url" "python"; break ;;
+            "JavaScript") verify_script "$script_url" "javascript"; break ;;
+            "PHP") verify_script "$script_url" "php"; break ;;
+            "Perl") verify_script "$script_url" "perl"; break ;;
+            "Quit") exit 0 ;;
+            *) echo "Invalid option $REPLY" ;;
+        esac
+    done
+}
+
+# Script Entry Point
+main "$@"
