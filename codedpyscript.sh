@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# --- ENCRYPTED SECTION START ---
+encoded_script="""CiMgT2JmdXNjYXRlZCBTY3JpcHQgU3RhcnRzIEhlcmUKIyBBZGQgeW91ciBvYnNjdXJhdGVkIHNjcmlwdCBjb250ZW50IGJlbG93LgpSRUFEX09CRlVTQ0FURUQ9ImJhc2U2NCBlbmNvZGVkIHNjcmlwdCBjb250ZW50IgpiYXNlNjRfZGVjb2RlKCJEaWN0aW9uYXJ5IE9yIEZ1bGx5IFNjcmlwdCBIZXJlLiBQYXN0ZSB5b3VyIGRlY29kZWQgc2VjdGlvbiBoZXJlLiIpCmZ1bmN0aW9uIGRlY29kZV9hbmRfcnVuKCkgewogIGJhc2U2NF9lbmNvZGVkPSIkMSIKICBlY2hvICJFeGVjdXRpbmcgc2NyaXB0Li4uIgogIGNobW9kICt4IGNvbmZpZ3VyZS5zaAogIGJhc2U2NCAtZCAkb2JmdXNjYXRlZF9zY3JpcHRfZW5jb2RlZAogIHNsZWVwIDIuMAogIGJhc2U2NCBlbmNvZGVkCn0KCmRlY29kZV9hbmRfcnVuICR7c2NyaXB0X2NvZGVfcGxhY2Vob2xkZX0="""
+
+# Runtime decoding and execution.
+echo "Obfuscated script running..."
+echo "$encoded_script" | base64 --decode > /tmp/decoded_script.sh
+bash /tmp/decoded_script.sh
+rm -f /tmp/decoded_script.sh
