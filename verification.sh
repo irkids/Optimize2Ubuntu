@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration and Paths
-VERSION="1.2.0"
+VERSION="1.3.0"
 CONFIG_DIR="${HOME}/.script-verifier"
 TEMP_DIR="/tmp/script-verifier-$(date +%s)"
 LOG_FILE="${CONFIG_DIR}/verification.log"
@@ -21,7 +21,7 @@ PREREQUISITES_FILE="${CONFIG_DIR}/prerequisites.json"
 if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
     echo -e "${RED}Error: Requires BASH 4.x or higher. Current version: ${BASH_VERSION}${NC}"
     exit 1
-fi
+}
 
 # Logging Function
 log_message() {
@@ -32,7 +32,24 @@ log_message() {
 
 # Prerequisite Checking and Installation
 check_and_install_prerequisites() {
+    # Install jq if not present
+    if ! command -v jq &> /dev/null; then
+        echo -e "${YELLOW}Installing jq...${NC}"
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y jq
+        elif command -v brew &> /dev/null; then
+            brew install jq
+        else
+            echo -e "${RED}Cannot install jq. Please install it manually.${NC}"
+            return 1
+        fi
+    fi
+
     # Create prerequisites configuration if not exists
+    mkdir -p "$(dirname "${PREREQUISITES_FILE}")"
     if [[ ! -f "${PREREQUISITES_FILE}" ]]; then
         cat > "${PREREQUISITES_FILE}" << EOL
 {
@@ -122,168 +139,151 @@ EOL
         return 1
     }
 
+    # Read Prerequisites JSON Safely
+    read_json_value() {
+        local json_file="$1"
+        local query="$2"
+        jq -r "$query" "$json_file" 2>/dev/null
+    }
+
     # Main Prerequisite Checking and Installation
-    local prerequisites_json=$(cat "${PREREQUISITES_FILE}")
-    
     # Languages
-    for lang in $(echo "${prerequisites_json}" | jq -r '.languages | keys[]'); do
-        check_prerequisite "$lang" "$(echo "${prerequisites_json}" | jq -r ".languages.${lang}.min_version")" || {
+    local language_keys=$(jq -r '.languages | keys[]' "${PREREQUISITES_FILE}" 2>/dev/null)
+    for lang in $language_keys; do
+        min_version=$(jq -r ".languages.${lang}.min_version" "${PREREQUISITES_FILE}" 2>/dev/null)
+        install_command=$(jq -r ".languages.${lang}.install_command" "${PREREQUISITES_FILE}" 2>/dev/null)
+        
+        check_prerequisite "$lang" "$min_version" || {
             echo -e "${YELLOW}Installing ${lang}...${NC}"
-            eval "$(echo "${prerequisites_json}" | jq -r ".languages.${lang}.install_command")"
+            eval "$install_command"
         }
     done
 
     # Tools
-    for tool in $(echo "${prerequisites_json}" | jq -r '.tools | keys[]'); do
+    local tool_keys=$(jq -r '.tools | keys[]' "${PREREQUISITES_FILE}" 2>/dev/null)
+    for tool in $tool_keys; do
+        install_command=$(jq -r ".tools.${tool}.install_command" "${PREREQUISITES_FILE}" 2>/dev/null)
+        
         check_prerequisite "$tool" || {
             echo -e "${YELLOW}Installing ${tool}...${NC}"
-            eval "$(echo "${prerequisites_json}" | jq -r ".tools.${tool}.install_command")"
+            eval "$install_command"
         }
     done
 }
 
-# Advanced Function Detection and Verification
-advanced_function_detection() {
-    local script_path="$1"
-    local language="$2"
-    local github_repo="$3"
-
-    # Advanced detection using language-specific parsing
-    case "$language" in
-        "python")
-            python3 - << EOF
-import ast
-import sys
-
-def extract_functions(filename):
-    with open(filename, 'r') as file:
-        tree = ast.parse(file.read())
+# Validate GitHub or Raw GitHub URL
+validate_script_url() {
+    local url="$1"
     
-    functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-    print('\n'.join(functions))
-EOF
-            ;;
-        
-        "javascript")
-            node - << EOF
-const acorn = require('acorn');
-const walk = require('acorn-walk');
-const fs = require('fs');
-
-function extractFunctions(code) {
-    const ast = acorn.parse(code, {ecmaVersion: 2020});
-    const functions = [];
+    # Regex for GitHub repository or raw content URLs
+    local github_repo_regex='^https?://(www\.)?github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+(\.git)?$'
+    local raw_github_regex='^https?://raw\.githubusercontent\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/.+\.(py|js|php|pl)$'
     
-    walk.simple(ast, {
-        FunctionDeclaration(node) {
-            functions.push(node.id.name);
-        },
-        VariableDeclarator(node) {
-            if (node.init && node.init.type === 'ArrowFunctionExpression') {
-                functions.push(node.id.name);
-            }
-        }
-    });
-    
-    console.log(functions.join('\n'));
+    if [[ "$url" =~ $github_repo_regex ]] || [[ "$url" =~ $raw_github_regex ]]; then
+        echo "$url"
+        return 0
+    else
+        echo -e "${RED}Invalid GitHub repository or raw script URL${NC}"
+        return 1
+    fi
 }
 
-const code = fs.readFileSync(process.argv[2], 'utf-8');
-extractFunctions(code);
-EOF
+# Download Script
+download_script() {
+    local url="$1"
+    local output_dir="${TEMP_DIR}/script"
+    
+    mkdir -p "$output_dir"
+    
+    # Detect download method
+    if command -v curl &> /dev/null; then
+        curl -L "$url" -o "${output_dir}/script" 2>/dev/null
+    elif command -v wget &> /dev/null; then
+        wget -O "${output_dir}/script" "$url" 2>/dev/null
+    else
+        echo -e "${RED}Neither curl nor wget available for download${NC}"
+        return 1
+    fi
+    
+    # Check download success
+    if [[ -s "${output_dir}/script" ]]; then
+        echo "${output_dir}/script"
+        return 0
+    else
+        echo -e "${RED}Failed to download script${NC}"
+        return 1
+    fi
+}
+
+# Function Verification (Simplified for this example)
+verify_script_functions() {
+    local script_path="$1"
+    local language=$(file -b --mime-type "$script_path" | cut -d'/' -f2)
+    
+    echo -e "${YELLOW}Analyzing script: $script_path${NC}"
+    
+    case "$language" in
+        "x-python")
+            functions=$(grep -E '^def ' "$script_path" | awk '{print $2}' | cut -d'(' -f1)
+            ;;
+        "x-javascript")
+            functions=$(grep -E '(function |=>)' "$script_path" | awk '{print $2}' | cut -d'(' -f1)
+            ;;
+        "x-php")
+            functions=$(grep -E '^(public|private|protected)? function ' "$script_path" | awk '{print $3}' | cut -d'(' -f1)
+            ;;
+        "x-perl")
+            functions=$(grep -E '^sub ' "$script_path" | awk '{print $2}')
+            ;;
+        *)
+            echo -e "${RED}Unsupported language: $language${NC}"
+            return 1
             ;;
     esac
-}
-
-# Main Verification Process
-verify_script_deployment() {
-    local github_repo="$1"
     
-    # Prompt for GitHub repository
-    read -p "Enter GitHub repository URL for the source script: " github_repo
-    
-    # Validate GitHub repository URL
-    if [[ ! "$github_repo" =~ ^https://github.com/[^/]+/[^/]+$ ]]; then
-        echo -e "${RED}Invalid GitHub repository URL${NC}"
-        return 1
-    fi
-
-    # Clone or download repository
-    mkdir -p "${TEMP_DIR}/repo"
-    git clone "$github_repo" "${TEMP_DIR}/repo" || {
-        echo -e "${RED}Failed to clone repository${NC}"
-        return 1
-    }
-
-    # Detect script language
-    local script_language=""
-    local script_path=""
-
-    # Language detection logic
-    for ext in py js php pl; do
-        script_path=$(find "${TEMP_DIR}/repo" -type f -name "*.$ext" | head -n 1)
-        if [[ -n "$script_path" ]]; then
-            case "$ext" in
-                "py") script_language="python" ;;
-                "js") script_language="javascript" ;;
-                "php") script_language="php" ;;
-                "pl") script_language="perl" ;;
-            esac
-            break
-        fi
+    echo -e "${YELLOW}Detected Functions:${NC}"
+    for func in $functions; do
+        echo -e "${GREEN}✓ ${func}${NC}"
     done
-
-    if [[ -z "$script_language" ]]; then
-        echo -e "${RED}Could not detect script language${NC}"
-        return 1
-    fi
-
-    # Advanced function detection
-    local functions
-    mapfile -t functions < <(advanced_function_detection "$script_path" "$script_language")
-
-    # Verification results
-    local total_functions=${#functions[@]}
-    local verified_functions=0
-
-    for func in "${functions[@]}"; do
-        # Placeholder for advanced function verification
-        # This would involve more sophisticated checks based on language
-        if verify_function_existence "$func" "$script_language"; then
-            echo -e "${GREEN}✓ Function '$func' verified${NC}"
-            ((verified_functions++))
-        else
-            echo -e "${RED}✗ Function '$func' not verified${NC}"
-        fi
-    done
-
-    # Summary
-    echo -e "\n${YELLOW}Deployment Verification Summary:${NC}"
-    echo -e "Total Functions: ${total_functions}"
-    echo -e "Verified Functions: ${verified_functions}"
-    echo -e "Failed Functions: $((total_functions - verified_functions))"
 }
 
-# Execution Permissions and Setup
-setup_script() {
-    mkdir -p "${CONFIG_DIR}"
-    chmod +x "$0"
-    log_message "INFO" "Script verifier initialized and permissions set"
-}
-
-# Main Execution Flow
+# Main Execution
 main() {
-    # Initialize script
-    setup_script
+    # Initialize directories
+    mkdir -p "${CONFIG_DIR}"
+    mkdir -p "${TEMP_DIR}"
 
     # Check and install prerequisites
     check_and_install_prerequisites
 
-    # Verify script deployment
-    verify_script_deployment
+    # Interactive URL input
+    read -p "Enter GitHub repository or raw script URL: " script_url
+
+    # Validate URL
+    validated_url=$(validate_script_url "$script_url")
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}Invalid URL. Exiting.${NC}"
+        exit 1
+    fi
+
+    # Download script
+    downloaded_script=$(download_script "$validated_url")
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}Script download failed. Exiting.${NC}"
+        exit 1
+    fi
+
+    # Verify script functions
+    verify_script_functions "$downloaded_script"
 }
 
 # Run main
 main "$@"
+
+# Cleanup
+cleanup() {
+    rm -rf "${TEMP_DIR}"
+}
+trap cleanup EXIT
 
 exit 0
