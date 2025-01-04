@@ -87,11 +87,25 @@ import psutil
 import resource
 import netifaces
 from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
-import dpdk
-import intel_qat
+
+# Hardware acceleration stub
+class DummyHardwareAccel:
+    def is_available(self):
+        return False
+    def initialize(self):
+        pass
+    def cleanup(self):
+        pass
+    def process_packet(self, data):
+        return data
+
+# Create global instances instead of importing dpdk and intel_qat
+dpdk = DummyHardwareAccel()
+intel_qat = DummyHardwareAccel()
+
+# Continue with other imports
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
-from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
 
 # Database and ORM
 import asyncpg
