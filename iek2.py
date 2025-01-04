@@ -165,6 +165,64 @@ from loguru import logger
 import structlog
 from prometheus_async.aio import time as prometheus_async_time
 
+async def install_dependencies():
+    """Automatically install and configure DPDK and required dependencies."""
+    try:
+        # Update package list
+        os.system('apt-get update > /dev/null 2>&1')
+        
+        # Install basic dependencies
+        os.system('apt-get install -y build-essential libnuma-dev python3-dev meson ninja-build linux-headers-$(uname -r) pkg-config > /dev/null 2>&1')
+        
+        # Create temporary directory for DPDK installation
+        temp_dir = '/tmp/dpdk_install'
+        os.makedirs(temp_dir, exist_ok=True)
+        os.chdir(temp_dir)
+        
+        # Download and extract DPDK
+        os.system('wget https://fast.dpdk.org/rel/dpdk-23.11.tar.xz -q')
+        os.system('tar xf dpdk-23.11.tar.xz')
+        os.chdir('dpdk-23.11')
+        
+        # Build and install DPDK
+        os.system('meson build > /dev/null 2>&1')
+        os.chdir('build')
+        os.system('ninja > /dev/null 2>&1')
+        os.system('ninja install > /dev/null 2>&1')
+        
+        # Configure hugepages
+        os.system('echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages')
+        os.makedirs('/mnt/huge', exist_ok=True)
+        os.system('mount -t hugetlbfs nodev /mnt/huge > /dev/null 2>&1')
+        
+        # Add hugepages to fstab if not already present
+        with open('/etc/fstab', 'r') as f:
+            if 'hugetlbfs' not in f.read():
+                os.system('echo "nodev /mnt/huge hugetlbfs defaults 0 0" >> /etc/fstab')
+        
+        # Install Python DPDK bindings
+        os.system('pip3 install dpdkbind > /dev/null 2>&1')
+        
+        # Clean up
+        os.system(f'rm -rf {temp_dir}')
+        
+        print("Dependencies installed successfully")
+        return True
+        
+    except Exception as e:
+        print(f"Error installing dependencies: {str(e)}")
+        return False
+
+# Check if script is running as root
+if os.geteuid() != 0:
+    print("This script must be run as root!")
+    sys.exit(1)
+
+# Run dependency installation
+if not asyncio.run(install_dependencies()):
+    print("Failed to install dependencies. Exiting.")
+    sys.exit(1)
+
 class ContainerOrchestrator:
     """
     Enterprise-grade container orchestration for IKEv2/IPsec VPN with Kubernetes
