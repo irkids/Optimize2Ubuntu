@@ -83,13 +83,11 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Now continue with your other imports
 import json
 import time
 import uuid
 import socket
 import logging
-# ... rest of your imports ...
 import asyncio
 import inspect
 import threading
@@ -105,13 +103,13 @@ from pathlib import Path
 from enum import Enum
 from collections import OrderedDict, defaultdict
 
-# Network and system monitoring [ADDING NEW OPTIMIZED IMPORTS]
+# Network and system monitoring
 import psutil
 import resource
 import netifaces
 from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
 
-# Create dummy classes for dpdk and intel_qat
+# Hardware acceleration dummy classes
 class DummyHardwareAccel:
     def is_available(self):
         return False
@@ -126,7 +124,6 @@ class DummyHardwareAccel:
 dpdk = DummyHardwareAccel()
 intel_qat = DummyHardwareAccel()
 
-# Continue with other imports
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 
