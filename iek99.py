@@ -2,20 +2,29 @@
 import os
 import sys
 import subprocess
+import venv
 
-def install_dependencies():
-    """Install required system and Python packages"""
+def setup_virtual_environment():
+    """Create and setup virtual environment"""
     try:
-        # Update package list
+        # Install required system packages
         subprocess.run(['apt-get', 'update'], check=True)
+        subprocess.run(['apt-get', 'install', '-y', 'python3-venv', 'python3-pip'], check=True)
         
-        # Install system packages
-        subprocess.run(['apt-get', 'install', '-y', 'python3-pip', 'python3-dev'], check=True)
+        # Create virtual environment
+        venv_path = '/opt/script_venv'
+        if not os.path.exists(venv_path):
+            print("Creating virtual environment...")
+            venv.create(venv_path, with_pip=True)
         
-        # Upgrade pip
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'], check=True)
+        # Get paths
+        venv_python = os.path.join(venv_path, 'bin', 'python')
+        venv_pip = os.path.join(venv_path, 'bin', 'pip')
         
-        # Install required Python packages one by one using subprocess
+        # Upgrade pip in virtual environment
+        subprocess.run([venv_pip, 'install', '--upgrade', 'pip'], check=True)
+        
+        # Install required packages in virtual environment
         packages = [
             'asyncpg',
             'sqlalchemy',
@@ -38,12 +47,17 @@ def install_dependencies():
         
         for package in packages:
             print(f"Installing {package}...")
-            subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', package], check=True)
+            subprocess.run([venv_pip, 'install', package], check=True)
         
-        print("Successfully installed all dependencies")
+        print("Successfully set up virtual environment and installed dependencies")
+        
+        # Re-execute the script within the virtual environment
+        if os.environ.get('VIRTUAL_ENV') != venv_path:
+            os.execv(venv_python, [venv_python] + sys.argv)
+            
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error installing dependencies: {e}")
+        print(f"Error setting up virtual environment: {e}")
         return False
     except Exception as e:
         print(f"Unexpected error: {e}")
@@ -54,9 +68,9 @@ if os.geteuid() != 0:
     print("This script must be run as root!")
     sys.exit(1)
 
-# Install dependencies
-if not install_dependencies():
-    print("Failed to install dependencies. Exiting.")
+# Setup virtual environment and install dependencies
+if not setup_virtual_environment():
+    print("Failed to setup virtual environment. Exiting.")
     sys.exit(1)
 
 # Create dummy classes for dpdk and intel_qat
