@@ -7,12 +7,15 @@ def install_dependencies():
     """Install required system and Python packages"""
     try:
         # Update package list
-        os.system('apt-get update > /dev/null 2>&1')
+        subprocess.run(['apt-get', 'update'], check=True)
         
         # Install system packages
-        os.system('apt-get install -y python3-pip python3-dev > /dev/null 2>&1')
+        subprocess.run(['apt-get', 'install', '-y', 'python3-pip', 'python3-dev'], check=True)
         
-        # Install required Python packages
+        # Upgrade pip
+        subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'], check=True)
+        
+        # Install required Python packages one by one using subprocess
         packages = [
             'asyncpg',
             'sqlalchemy',
@@ -34,12 +37,16 @@ def install_dependencies():
         ]
         
         for package in packages:
-            os.system(f'pip3 install {package} > /dev/null 2>&1')
+            print(f"Installing {package}...")
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', package], check=True)
         
         print("Successfully installed all dependencies")
         return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing dependencies: {e}")
+        return False
     except Exception as e:
-        print(f"Error installing dependencies: {str(e)}")
+        print(f"Unexpected error: {e}")
         return False
 
 # Check if running as root
@@ -51,6 +58,23 @@ if os.geteuid() != 0:
 if not install_dependencies():
     print("Failed to install dependencies. Exiting.")
     sys.exit(1)
+
+# Create dummy classes for dpdk and intel_qat
+class DPDK:
+    def __init__(self):
+        pass
+    def is_available(self):
+        return False
+
+class IntelQAT:
+    def __init__(self):
+        pass
+    def is_available(self):
+        return False
+
+# Create global instances
+dpdk = DPDK()
+intel_qat = IntelQAT()
 
 # Now continue with your other imports
 import json
