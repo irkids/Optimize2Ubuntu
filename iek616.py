@@ -7,17 +7,15 @@ import venv
 def setup_virtual_environment():
     """Create and setup virtual environment"""
     try:
-        # Install required system packages
-        subprocess.run(['apt-get', 'update'], check=True)
-        subprocess.run(['apt-get', 'install', '-y', 'python3-venv', 'python3-pip'], check=True)
-        
-        # Create virtual environment
         venv_path = '/opt/script_venv'
+        
+        # Create virtual environment if it doesn't exist
         if not os.path.exists(venv_path):
             print("Creating virtual environment...")
             venv.create(venv_path, with_pip=True)
         
-        # Get paths
+        # Get virtual environment paths
+        venv_python = os.path.join(venv_path, 'bin', 'python')
         venv_pip = os.path.join(venv_path, 'bin', 'pip')
         
         # Upgrade pip in virtual environment
@@ -50,13 +48,15 @@ def setup_virtual_environment():
         
         print("Successfully set up virtual environment and installed dependencies")
         
-        # Create activation script
-        with open('run_main.sh', 'w') as f:
-            f.write(f'''#!/bin/bash
-source {venv_path}/bin/activate
-python3 main_script.py
-''')
-        os.chmod('run_main.sh', 0o755)
+        # Create a shell script to run the main program
+        runner_script = "run_main.sh"
+        with open(runner_script, 'w') as f:
+            f.write(f"""#!/bin/bash
+{venv_python} "$@"
+""")
+        
+        # Make the runner script executable
+        os.chmod(runner_script, 0o755)
         
         return True
         
@@ -67,34 +67,21 @@ python3 main_script.py
         print(f"Unexpected error: {e}")
         return False
 
-# Check if running as root
-if os.geteuid() != 0:
-    print("This script must be run as root!")
-    sys.exit(1)
+def main():
+    # Check if running as root
+    if os.geteuid() != 0:
+        print("This script must be run as root!")
+        sys.exit(1)
 
-# Setup virtual environment and install dependencies
-if not setup_virtual_environment():
-    print("Failed to setup virtual environment. Exiting.")
-    sys.exit(1)
+    # Setup virtual environment and install dependencies
+    if not setup_virtual_environment():
+        print("Failed to setup virtual environment. Exiting.")
+        sys.exit(1)
 
-print("\nSetup complete! To run the main script, use: ./run_main.sh")
+    print("\nSetup complete! To run the main script, use: ./run_main.sh your_script.py")
 
-# Create dummy classes for dpdk and intel_qat
-class DPDK:
-    def __init__(self):
-        pass
-    def is_available(self):
-        return False
-
-class IntelQAT:
-    def __init__(self):
-        pass
-    def is_available(self):
-        return False
-
-# Create global instances
-dpdk = DPDK()
-intel_qat = IntelQAT()
+if __name__ == "__main__":
+    main()
 
 # Now continue with your other imports
 import json
