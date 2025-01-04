@@ -3,46 +3,21 @@ import os
 import sys
 import subprocess
 import venv
+import pkg_resources
 
-def install_system_dependencies():
-    """Install required system packages"""
+def verify_package_installation(package_name):
+    """Verify that a package is properly installed"""
     try:
-        system_packages = [
-            'python3-dev',
-            'python3-venv',
-            'python3-pip',
-            'build-essential',
-            'libpq-dev',  # Required for asyncpg
-            'gcc',
-            'curl'
-        ]
-        
-        subprocess.run(['apt-get', 'update'], check=True)
-        subprocess.run(['apt-get', 'install', '-y'] + system_packages, check=True)
+        pkg_resources.require(package_name)
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error installing system dependencies: {e}")
+    except pkg_resources.DistributionNotFound:
         return False
-
-def verify_installation(venv_python, package):
-    """Verify that a package can be imported"""
-    try:
-        result = subprocess.run(
-            [venv_python, '-c', f'import {package}'],
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0
     except Exception:
         return False
 
 def setup_virtual_environment():
     """Create and setup virtual environment"""
     try:
-        # Install system dependencies first
-        if not install_system_dependencies():
-            return False
-            
         venv_path = '/opt/script_venv'
         
         # Create virtual environment if it doesn't exist
@@ -54,50 +29,71 @@ def setup_virtual_environment():
         venv_python = os.path.join(venv_path, 'bin', 'python')
         venv_pip = os.path.join(venv_path, 'bin', 'pip')
         
-        # Upgrade pip and install wheel in virtual environment
+        # Upgrade pip in virtual environment
         subprocess.run([venv_pip, 'install', '--upgrade', 'pip'], check=True)
-        subprocess.run([venv_pip, 'install', '--upgrade', 'wheel'], check=True)
-        
-        # Install required packages in virtual environment
+
+        # First install base requirements
+        base_packages = [
+            'wheel',
+            'setuptools>=45.0.0'
+        ]
+
+        for package in base_packages:
+            print(f"Installing base package {package}...")
+            subprocess.run([venv_pip, 'install', '--upgrade', package], check=True)
+
+        # Main packages with specific versions
         packages = [
-            'asyncpg',
-            'sqlalchemy',
-            'fastapi',
-            'uvicorn',
-            'psutil',
-            'prometheus_client',
-            'kubernetes',
-            'docker',
-            'pytest',
-            'pytest-asyncio',
-            'hypothesis',
-            'aioredis',
-            'cryptography',
-            'bcrypt',
-            'passlib',
-            'pydantic',
-            'netifaces'
+            'asyncpg==0.29.0',
+            'sqlalchemy==2.0.27',
+            'fastapi==0.110.0',
+            'uvicorn==0.27.1',
+            'psutil==5.9.8',
+            'prometheus_client==0.20.0',
+            'kubernetes==29.0.0',
+            'docker==7.0.0',
+            'pytest==8.0.0',
+            'pytest-asyncio==0.23.5',
+            'hypothesis==6.97.4',
+            'aioredis==2.0.1',
+            'cryptography==42.0.5',
+            'bcrypt==4.1.2',
+            'passlib==1.7.4',
+            'pydantic==2.6.3',
+            'netifaces==0.11.0'
         ]
         
+        # Install packages one by one and verify installation
         for package in packages:
+            package_name = package.split('==')[0]
             print(f"Installing {package}...")
-            subprocess.run([venv_pip, 'install', '--no-cache-dir', package], check=True)
             
-            # Verify the installation
-            package_name = package.split('[')[0]  # Handle cases like package[extra]
-            if not verify_installation(venv_python, package_name):
-                print(f"Failed to import {package_name} after installation")
+            try:
+                # Try to install the package
+                subprocess.run([venv_pip, 'install', package], 
+                             check=True, 
+                             capture_output=True,
+                             text=True)
+                
+                # Verify installation
+                if not verify_package_installation(package_name):
+                    raise Exception(f"Failed to verify {package_name} installation")
+                    
+            except subprocess.CalledProcessError as e:
+                print(f"Error installing {package}: {e.stdout}\n{e.stderr}")
+                return False
+            except Exception as e:
+                print(f"Error verifying {package}: {str(e)}")
                 return False
         
         print("Successfully set up virtual environment and installed dependencies")
         
-        # Create activation script
+        # Create a shell script to run the main program
         runner_script = "run_main.sh"
         with open(runner_script, 'w') as f:
             f.write(f"""#!/bin/bash
 source {os.path.join(venv_path, 'bin/activate')}
-export PYTHONPATH={venv_path}/lib/python3.12/site-packages:$PYTHONPATH
-python3 "$@"
+{venv_python} "$@"
 """)
         
         # Make the runner script executable
