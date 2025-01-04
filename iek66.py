@@ -1,46 +1,14 @@
 #!/usr/bin/env python3
 import os
 import sys
-import time
-import signal
 import subprocess
 import venv
-
-def wait_for_apt():
-    """Wait for apt locks to be released"""
-    max_attempts = 60  # Maximum number of attempts (10 minutes total)
-    attempt = 0
-    
-    while attempt < max_attempts:
-        try:
-            # Try running apt-get update
-            result = subprocess.run(
-                ['apt-get', 'update'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return True  # If successful, return True
-        except subprocess.CalledProcessError as e:
-            if "Could not get lock" in e.stderr or "Unable to acquire" in e.stderr:
-                print(f"Waiting for apt lock to be released (attempt {attempt + 1}/{max_attempts})...")
-                time.sleep(10)  # Wait 10 seconds before next attempt
-                attempt += 1
-            else:
-                print(f"Error updating apt: {e.stderr}")
-                return False
-    
-    print("Timeout waiting for apt lock to be released")
-    return False
 
 def setup_virtual_environment():
     """Create and setup virtual environment"""
     try:
-        # Wait for apt locks to be released
-        if not wait_for_apt():
-            raise Exception("Failed to acquire apt lock")
-        
         # Install required system packages
+        subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'python3-venv', 'python3-pip'], check=True)
         
         # Create virtual environment
@@ -81,6 +49,15 @@ def setup_virtual_environment():
             subprocess.run([venv_pip, 'install', package], check=True)
         
         print("Successfully set up virtual environment and installed dependencies")
+        
+        # Create activation script
+        with open('run_main.sh', 'w') as f:
+            f.write(f'''#!/bin/bash
+source {venv_path}/bin/activate
+python3 main_script.py
+''')
+        os.chmod('run_main.sh', 0o755)
+        
         return True
         
     except subprocess.CalledProcessError as e:
@@ -99,6 +76,8 @@ if os.geteuid() != 0:
 if not setup_virtual_environment():
     print("Failed to setup virtual environment. Exiting.")
     sys.exit(1)
+
+print("\nSetup complete! To run the main script, use: ./run_main.sh")
 
 # Create dummy classes for dpdk and intel_qat
 class DPDK:
@@ -145,7 +124,7 @@ import resource
 import netifaces
 from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
 
-# Hardware acceleration stub
+# Create dummy classes for dpdk and intel_qat
 class DummyHardwareAccel:
     def is_available(self):
         return False
@@ -156,7 +135,7 @@ class DummyHardwareAccel:
     def process_packet(self, data):
         return data
 
-# Create global instances instead of importing dpdk and intel_qat
+# Create global instances
 dpdk = DummyHardwareAccel()
 intel_qat = DummyHardwareAccel()
 
