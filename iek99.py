@@ -18,7 +18,6 @@ def setup_virtual_environment():
             venv.create(venv_path, with_pip=True)
         
         # Get paths
-        venv_python = os.path.join(venv_path, 'bin', 'python')
         venv_pip = os.path.join(venv_path, 'bin', 'pip')
         
         # Upgrade pip in virtual environment
@@ -50,12 +49,8 @@ def setup_virtual_environment():
             subprocess.run([venv_pip, 'install', package], check=True)
         
         print("Successfully set up virtual environment and installed dependencies")
-        
-        # Re-execute the script within the virtual environment
-        if os.environ.get('VIRTUAL_ENV') != venv_path:
-            os.execv(venv_python, [venv_python] + sys.argv)
-            
         return True
+        
     except subprocess.CalledProcessError as e:
         print(f"Error setting up virtual environment: {e}")
         return False
