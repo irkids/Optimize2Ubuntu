@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
 import os
 import sys
+import subprocess
 
-def check_and_install_dependencies():
-    """Install all required system dependencies"""
-    packages_to_install = [
-        'python3-pip',
-        'python3-dev', 
-        'build-essential',
-        'git',
-        'curl',
-        'wget'
-    ]
-    
-    os.system('apt-get update > /dev/null 2>&1')
-    
-    for package in packages_to_install:
-        os.system(f'apt-get install -y {package} > /dev/null 2>&1')
-
-    # Install Python packages
-    pip_packages = [
-        'psutil',
-        'prometheus_client',
-        'asyncpg',
-        'sqlalchemy',
-        'fastapi',
-        'aioredis',
-        'cryptography',
-        'bcrypt',
-        'pydantic',
-        'kubernetes',
-        'pytest',
-        'hypothesis',
-        'numpy',
-        'pandas',
-        'scikit-learn'
-    ]
-    
-    for package in pip_packages:
-        os.system(f'pip3 install --quiet {package} > /dev/null 2>&1')
-
-    return True
+def install_dependencies():
+    """Install required system and Python packages"""
+    try:
+        # Update package list
+        os.system('apt-get update > /dev/null 2>&1')
+        
+        # Install system packages
+        os.system('apt-get install -y python3-pip python3-dev > /dev/null 2>&1')
+        
+        # Install required Python packages
+        packages = [
+            'asyncpg',
+            'sqlalchemy',
+            'fastapi',
+            'uvicorn',
+            'psutil',
+            'prometheus_client',
+            'kubernetes',
+            'docker',
+            'pytest',
+            'pytest-asyncio',
+            'hypothesis',
+            'aioredis',
+            'cryptography',
+            'bcrypt',
+            'passlib',
+            'pydantic',
+            'netifaces'
+        ]
+        
+        for package in packages:
+            os.system(f'pip3 install {package} > /dev/null 2>&1')
+        
+        print("Successfully installed all dependencies")
+        return True
+    except Exception as e:
+        print(f"Error installing dependencies: {str(e)}")
+        return False
 
 # Check if running as root
 if os.geteuid() != 0:
@@ -48,17 +48,9 @@ if os.geteuid() != 0:
     sys.exit(1)
 
 # Install dependencies
-check_and_install_dependencies()
-
-# Create dummy DPDK class
-class DPDK:
-    def __init__(self):
-        pass
-    def is_available(self):
-        return False
-
-# Create global instance to replace dpdk import
-dpdk = DPDK()
+if not install_dependencies():
+    print("Failed to install dependencies. Exiting.")
+    sys.exit(1)
 
 # Now continue with your other imports
 import json
