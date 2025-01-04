@@ -183,15 +183,13 @@ class ContainerOrchestrator:
         self.resource_manager = ContainerResourceManager(self)
         self.system_optimizer = SystemOptimizer()
 
-    async def initialize(self):
-          """Initialize container orchestration systems with optimizations."""
-
-        try:
-            # Initialize Kubernetes client
-            config.load_incluster_config()
-            self.k8s_client = client.CoreV1Api()
-            await self.system_optimizer._configure_system_params()
-
+async def initialize(self):
+    """Initialize container orchestration systems with optimizations."""
+    try:
+        # Initialize Kubernetes client
+        config.load_incluster_config()
+        self.k8s_client = client.CoreV1Api()
+        await self.system_optimizer._configure_system_params()
             # Initialize Docker client
             self.docker_client = docker.from_env()
             
