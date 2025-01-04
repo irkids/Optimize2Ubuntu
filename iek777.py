@@ -48,15 +48,10 @@ def setup_virtual_environment():
         
         print("Successfully set up virtual environment and installed dependencies")
         
-        # Create a shell script to run the main program
-        runner_script = "run_main.sh"
-        with open(runner_script, 'w') as f:
-            f.write(f"""#!/bin/bash
-{venv_python} "$@"
-""")
-        
-        # Make the runner script executable
-        os.chmod(runner_script, 0o755)
+        # Activate the virtual environment
+        venv_activate = os.path.join(venv_path, 'bin', 'activate')
+        os.environ['VIRTUAL_ENV'] = venv_path
+        os.environ['PATH'] = os.path.join(venv_path, 'bin') + os.pathsep + os.environ['PATH']
         
         return True
         
@@ -67,21 +62,113 @@ def setup_virtual_environment():
         print(f"Unexpected error: {e}")
         return False
 
-def main():
-    # Check if running as root
+def check_and_install_dependencies():
+    """Install all required system dependencies"""
     if os.geteuid() != 0:
         print("This script must be run as root!")
         sys.exit(1)
 
-    # Setup virtual environment and install dependencies
     if not setup_virtual_environment():
         print("Failed to setup virtual environment. Exiting.")
         sys.exit(1)
 
-    print("\nSetup complete! To run the main script, use: ./run_main.sh your_script.py")
+    # Only import modules after virtual environment is set up
+    try:
+        import asyncpg
+        import sqlalchemy
+        import fastapi
+        import uvicorn
+        import psutil
+        import prometheus_client
+        import kubernetes
+        import docker
+        import pytest
+        import aioredis
+        import cryptography
+        import bcrypt
+        import passlib
+        import pydantic
+        import netifaces
+        
+        print("All dependencies imported successfully!")
+        return True
+    except ImportError as e:
+        print(f"Failed to import dependencies: {e}")
+        return False
 
+# First run the setup
 if __name__ == "__main__":
-    main()
+    if check_and_install_dependencies():
+        # Only import other modules after successful setup
+        print("Starting main program...")
+        
+        # Your imports go here
+        import json
+        import time
+        import uuid
+        import socket
+        import logging
+        import asyncio
+        import inspect
+        import threading
+        import ipaddress
+        import multiprocessing
+        import ssl
+        from typing import Dict, List, Optional, Union, Any, Callable, Tuple, Set
+        from datetime import datetime, timedelta
+        from dataclasses import dataclass, field
+        from concurrent.futures import ThreadPoolExecutor
+        from functools import partial, lru_cache
+        from pathlib import Path
+        from enum import Enum
+        from collections import OrderedDict, defaultdict
+
+        # Network and system monitoring
+        import psutil
+        import resource
+        import netifaces
+        from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
+        from prometheus_async.aio import time as prometheus_async_time
+
+        # Your check_and_install_dependencies function implementation goes here
+        def check_and_install_dependencies():
+            packages_to_install = [
+                'python3-pip',
+                'python3-dev', 
+                'build-essential',
+                'git',
+                'curl',
+                'wget'
+            ]
+            
+            os.system('apt-get update > /dev/null 2>&1')
+            
+            for package in packages_to_install:
+                os.system(f'apt-get install -y {package} > /dev/null 2>&1')
+
+            # Install Python packages
+            pip_packages = [
+                'psutil',
+                'prometheus_client',
+                'asyncpg',
+                'sqlalchemy',
+                'fastapi',
+                'aioredis',
+                'cryptography',
+                'bcrypt',
+                'pydantic',
+                'kubernetes',
+                'pytest',
+                'hypothesis',
+                'numpy',
+                'pandas',
+                'scikit-learn'
+            ]
+            
+            for package in pip_packages:
+                os.system(f'pip3 install --quiet {package} > /dev/null 2>&1')
+
+            return True
 
 import json
 import time
