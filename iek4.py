@@ -1,11 +1,72 @@
-# Standard library imports
+#!/usr/bin/env python3
 import os
 import sys
+
+def check_and_install_dependencies():
+    """Install all required system dependencies"""
+    packages_to_install = [
+        'python3-pip',
+        'python3-dev', 
+        'build-essential',
+        'git',
+        'curl',
+        'wget'
+    ]
+    
+    os.system('apt-get update > /dev/null 2>&1')
+    
+    for package in packages_to_install:
+        os.system(f'apt-get install -y {package} > /dev/null 2>&1')
+
+    # Install Python packages
+    pip_packages = [
+        'psutil',
+        'prometheus_client',
+        'asyncpg',
+        'sqlalchemy',
+        'fastapi',
+        'aioredis',
+        'cryptography',
+        'bcrypt',
+        'pydantic',
+        'kubernetes',
+        'pytest',
+        'hypothesis',
+        'numpy',
+        'pandas',
+        'scikit-learn'
+    ]
+    
+    for package in pip_packages:
+        os.system(f'pip3 install --quiet {package} > /dev/null 2>&1')
+
+    return True
+
+# Check if running as root
+if os.geteuid() != 0:
+    print("This script must be run as root!")
+    sys.exit(1)
+
+# Install dependencies
+check_and_install_dependencies()
+
+# Create dummy DPDK class
+class DPDK:
+    def __init__(self):
+        pass
+    def is_available(self):
+        return False
+
+# Create global instance to replace dpdk import
+dpdk = DPDK()
+
+# Now continue with your other imports
 import json
 import time
 import uuid
 import socket
 import logging
+# ... rest of your imports ...
 import asyncio
 import inspect
 import threading
