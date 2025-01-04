@@ -3,16 +3,27 @@ import os
 import sys
 import subprocess
 import venv
-import pkg_resources
 
-def verify_package_installation(package_name):
-    """Verify that a package is properly installed"""
+def install_system_dependencies():
+    """Install required system dependencies"""
     try:
-        pkg_resources.require(package_name)
+        # Update package list
+        subprocess.run(['apt-get', 'update'], check=True)
+        
+        # Install required system packages
+        system_packages = [
+            'python3-dev',
+            'python3-venv',
+            'build-essential',
+            'libpq-dev',  # Required for asyncpg
+            'gcc',
+            'git'
+        ]
+        
+        subprocess.run(['apt-get', 'install', '-y'] + system_packages, check=True)
         return True
-    except pkg_resources.DistributionNotFound:
-        return False
-    except Exception:
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing system dependencies: {e}")
         return False
 
 def setup_virtual_environment():
@@ -29,61 +40,39 @@ def setup_virtual_environment():
         venv_python = os.path.join(venv_path, 'bin', 'python')
         venv_pip = os.path.join(venv_path, 'bin', 'pip')
         
-        # Upgrade pip in virtual environment
+        # Upgrade pip and install wheel in virtual environment
         subprocess.run([venv_pip, 'install', '--upgrade', 'pip'], check=True)
-
-        # First install base requirements
-        base_packages = [
-            'wheel',
-            'setuptools>=45.0.0'
-        ]
-
-        for package in base_packages:
-            print(f"Installing base package {package}...")
-            subprocess.run([venv_pip, 'install', '--upgrade', package], check=True)
-
-        # Main packages with specific versions
+        subprocess.run([venv_pip, 'install', '--upgrade', 'wheel'], check=True)
+        subprocess.run([venv_pip, 'install', '--upgrade', 'setuptools>=45.0.0'], check=True)
+        
+        # Install required packages in virtual environment
         packages = [
-            'asyncpg==0.29.0',
-            'sqlalchemy==2.0.27',
-            'fastapi==0.110.0',
-            'uvicorn==0.27.1',
-            'psutil==5.9.8',
-            'prometheus_client==0.20.0',
-            'kubernetes==29.0.0',
-            'docker==7.0.0',
-            'pytest==8.0.0',
-            'pytest-asyncio==0.23.5',
-            'hypothesis==6.97.4',
-            'aioredis==2.0.1',
-            'cryptography==42.0.5',
-            'bcrypt==4.1.2',
-            'passlib==1.7.4',
-            'pydantic==2.6.3',
-            'netifaces==0.11.0'
+            'wheel',  # Install wheel first
+            'asyncpg',
+            'sqlalchemy',
+            'fastapi',
+            'uvicorn',
+            'psutil',
+            'prometheus_client',
+            'kubernetes',
+            'docker',
+            'pytest',
+            'pytest-asyncio',
+            'hypothesis',
+            'aioredis',
+            'cryptography',
+            'bcrypt',
+            'passlib',
+            'pydantic',
+            'netifaces'
         ]
         
-        # Install packages one by one and verify installation
         for package in packages:
-            package_name = package.split('==')[0]
             print(f"Installing {package}...")
-            
             try:
-                # Try to install the package
-                subprocess.run([venv_pip, 'install', package], 
-                             check=True, 
-                             capture_output=True,
-                             text=True)
-                
-                # Verify installation
-                if not verify_package_installation(package_name):
-                    raise Exception(f"Failed to verify {package_name} installation")
-                    
+                subprocess.run([venv_pip, 'install', '--no-cache-dir', package], check=True)
             except subprocess.CalledProcessError as e:
-                print(f"Error installing {package}: {e.stdout}\n{e.stderr}")
-                return False
-            except Exception as e:
-                print(f"Error verifying {package}: {str(e)}")
+                print(f"Error installing {package}: {e}")
                 return False
         
         print("Successfully set up virtual environment and installed dependencies")
@@ -93,7 +82,7 @@ def setup_virtual_environment():
         with open(runner_script, 'w') as f:
             f.write(f"""#!/bin/bash
 source {os.path.join(venv_path, 'bin/activate')}
-{venv_python} "$@"
+python3 "$@"
 """)
         
         # Make the runner script executable
@@ -101,9 +90,6 @@ source {os.path.join(venv_path, 'bin/activate')}
         
         return True
         
-    except subprocess.CalledProcessError as e:
-        print(f"Error setting up virtual environment: {e}")
-        return False
     except Exception as e:
         print(f"Unexpected error: {e}")
         return False
@@ -112,6 +98,11 @@ def main():
     # Check if running as root
     if os.geteuid() != 0:
         print("This script must be run as root!")
+        sys.exit(1)
+
+    # Install system dependencies first
+    if not install_system_dependencies():
+        print("Failed to install system dependencies. Exiting.")
         sys.exit(1)
 
     # Setup virtual environment and install dependencies
