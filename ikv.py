@@ -2396,9 +2396,9 @@ class ConnectionPool:
 class NetworkOptimizer:
     """Advanced network stack optimization."""
     
-        def __init__(self, core_framework):
-        self.framework = core_framework
-        self.logger = core_framework.logger
+def __init__(self, core_framework):
+    self.framework = core_framework
+    self.logger = core_framework.logger
         
         # Initialize network components
         self.tcp_optimizer = TCPOptimizer()
