@@ -1,14 +1,46 @@
 #!/usr/bin/env python3
 import os
 import sys
+import time
+import signal
 import subprocess
 import venv
+
+def wait_for_apt():
+    """Wait for apt locks to be released"""
+    max_attempts = 60  # Maximum number of attempts (10 minutes total)
+    attempt = 0
+    
+    while attempt < max_attempts:
+        try:
+            # Try running apt-get update
+            result = subprocess.run(
+                ['apt-get', 'update'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return True  # If successful, return True
+        except subprocess.CalledProcessError as e:
+            if "Could not get lock" in e.stderr or "Unable to acquire" in e.stderr:
+                print(f"Waiting for apt lock to be released (attempt {attempt + 1}/{max_attempts})...")
+                time.sleep(10)  # Wait 10 seconds before next attempt
+                attempt += 1
+            else:
+                print(f"Error updating apt: {e.stderr}")
+                return False
+    
+    print("Timeout waiting for apt lock to be released")
+    return False
 
 def setup_virtual_environment():
     """Create and setup virtual environment"""
     try:
+        # Wait for apt locks to be released
+        if not wait_for_apt():
+            raise Exception("Failed to acquire apt lock")
+        
         # Install required system packages
-        subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'python3-venv', 'python3-pip'], check=True)
         
         # Create virtual environment
