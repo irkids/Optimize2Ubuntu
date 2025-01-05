@@ -23,6 +23,7 @@ def setup_virtual_environment():
             'setuptools>=45.0.0',
             'asyncpg',
             'sqlalchemy',
+            'alembic',  # Added alembic
             'fastapi',
             'uvicorn',
             'psutil',
@@ -37,12 +38,34 @@ def setup_virtual_environment():
             'bcrypt',
             'passlib',
             'pydantic',
-            'netifaces'
+            'netifaces',
+            'jwt',
+            'python-jose[cryptography]',  # For JWT support
+            'ansible-runner',
+            'docker',
+            'PyYAML',
+            'aiohttp',
+            'websockets',
+            'scapy',
+            'netfilterqueue',
+            'pyroute2',
+            'aiocache',
+            'redis',
+            'toml',
+            'dynaconf',
+            'loguru',
+            'structlog'
         ]
         
+        # Install packages with error handling
         for package in packages:
             print(f"Installing {package}...")
-            subprocess.run([venv_pip, 'install', '--no-cache-dir', package], check=True)
+            try:
+                subprocess.run([venv_pip, 'install', '--no-cache-dir', package], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error installing {package}: {e}")
+                print("Continuing with remaining packages...")
+                continue
         
         # Create runner script
         runner_script = os.path.join(os.getcwd(), "run_main.sh")
@@ -53,6 +76,7 @@ python "$@"
 """)
         
         os.chmod(runner_script, 0o755)
+        print("Successfully set up virtual environment and installed dependencies")
         return True
         
     except Exception as e:
