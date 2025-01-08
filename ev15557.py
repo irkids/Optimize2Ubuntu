@@ -35,6 +35,11 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
         venv_python = os.path.join(venv_path, "bin", "python")
         venv_pip = os.path.join(venv_path, "bin", "pip")
 
+        # Ensure pip exists in the virtual environment
+        if not os.path.exists(venv_pip):
+            print("pip is missing in the virtual environment. Installing pip...")
+            subprocess.check_call([venv_python, "-m", "ensurepip", "--upgrade"])
+
         # Upgrade pip and setuptools inside the virtual environment
         print("Upgrading pip and setuptools...")
         subprocess.check_call([venv_pip, "install", "--upgrade", "pip", "setuptools"])
@@ -50,19 +55,6 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
     except subprocess.CalledProcessError as e:
         print(f"Error during virtual environment setup: {e}")
         sys.exit(1)
-
-# Ensure the script runs in a virtual environment with all dependencies installed
-venv_python = setup_virtualenv_and_install_requirements(
-    venv_path="/opt/my_module_venv",  # Customize the path as needed
-    packages=[
-        "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
-        "prometheus_client", "psutil", "aioredis", "cryptography", 
-        "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", 
-        "ansible_runner", "docker", "kubernetes", "opentelemetry-api", 
-        "opentelemetry-sdk", "opentelemetry-exporter-jaeger", 
-        "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
-    ]
-)
 
 for module in required_packages:
     install_package(module)
