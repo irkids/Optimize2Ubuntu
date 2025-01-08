@@ -633,17 +633,18 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
-    metadata = Column(JSONB, nullable=True)  # Flexible user metadata
+    user_metadata = Column(JSONB, nullable=True)  # Flexible user metadata
 
     # Optimized indexes
     __table_args__ = (
         Index('idx_user_username_email', 'username', 'email'),
         Index('idx_user_created_at', 'created_at DESC'),
-        Index('idx_user_metadata', 'metadata', postgresql_using='gin')
+        Index('idx_user_metadata', 'user_metadata', postgresql_using='gin')
     )
 
     vpn_certificates = relationship("VPNCertificate", back_populates="user")
     vpn_sessions = relationship("VPNSession", back_populates="user")
+
 
 class VPNCertificate(Base):
     """Enhanced VPN certificate model with optimized storage."""
