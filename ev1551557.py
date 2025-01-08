@@ -38,16 +38,19 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
         # Ensure pip exists in the virtual environment
         if not os.path.exists(venv_pip):
             print("pip is missing in the virtual environment. Installing pip...")
+            # Use ensurepip to install pip if it's missing
             subprocess.check_call([venv_python, "-m", "ensurepip", "--upgrade"])
+            # Explicitly upgrade pip after ensurepip
+            subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip"])
 
         # Upgrade pip and setuptools inside the virtual environment
         print("Upgrading pip and setuptools...")
-        subprocess.check_call([venv_pip, "install", "--upgrade", "pip", "setuptools"])
+        subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip", "setuptools"])
 
         # Install required packages
         if packages:
             print(f"Installing required packages: {', '.join(packages)}")
-            subprocess.check_call([venv_pip, "install"] + packages)
+            subprocess.check_call([venv_python, "-m", "pip", "install"] + packages)
 
         print(f"Virtual environment setup completed. Use {venv_python} to run your script.")
         return venv_python
