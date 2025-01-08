@@ -53,6 +53,7 @@ import multiprocessing
 import ssl
 
 # Database and ORM
+from sqlalchemy import text
 from sqlalchemy import (
     create_engine, MetaData, Table, Column, Integer, String, Boolean,
     ForeignKey, DateTime, Text, Float, JSON as SQLJSON, and_, or_, not_
@@ -621,6 +622,7 @@ class ResourceMonitor:
             self.logger.error(f"Resource monitoring failed: {e}")
             raise
 # Enhanced User model with optimized indexes and JSONB
+
 class User(Base):
     """Enhanced user model with PostgreSQL-specific optimizations."""
     __tablename__ = "users"
@@ -638,7 +640,7 @@ class User(Base):
     # Optimized indexes
     __table_args__ = (
         Index('idx_user_username_email', 'username', 'email'),
-        Index('idx_user_created_at', 'created_at DESC'),
+        Index('idx_user_created_at', text('created_at DESC')),
         Index('idx_user_metadata', 'user_metadata', postgresql_using='gin')
     )
 
