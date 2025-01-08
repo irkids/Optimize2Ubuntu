@@ -86,7 +86,6 @@ import multiprocessing
 import ssl
 
 # Database and ORM
-from sqlalchemy import text
 from sqlalchemy import (
     create_engine, MetaData, Table, Column, Integer, String, Boolean,
     ForeignKey, DateTime, Text, Float, JSON as SQLJSON, and_, or_, not_
