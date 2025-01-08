@@ -125,10 +125,11 @@ from opentelemetry.exporter import jaeger
 def install_pip():
 # Configuration and Environment Setup
 def check_root():
-    """Check if script is running as root."""
+    """Check if the script is running as root."""
     if os.geteuid() != 0:
         print("This script must be run as root!")
         sys.exit(1)
+
 
 def install_system_dependencies():
     """Install required system packages."""
