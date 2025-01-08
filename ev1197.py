@@ -5,12 +5,17 @@ import subprocess
 import sys
 import shutil
 from pathlib import Path
+from logging import getLogger, basicConfig, INFO
+
+# Set up logging
+basicConfig(level=INFO)
+logger = getLogger("IKEv2 Installer")
 
 # Ensure the script is run as root
 def check_root():
     """Check if the script is running as root."""
     if os.geteuid() != 0:
-        print("This script must be run as root!")
+        logger.error("This script must be run as root!")
         sys.exit(1)
 
 check_root()
@@ -23,28 +28,18 @@ class DependencyManager:
         self.venv_pip = self.venv_path / "bin" / "pip"
         self.required_packages = [
             "redis>=5.2.0",
-            "toml",
             "asyncpg>=0.30.0",
             "sqlalchemy>=2.0.0",
             "fastapi>=0.95.0",
             "uvicorn>=0.34.0",
-            "prometheus_client",
-            "psutil",
+            "ansible",
             "cryptography",
             "bcrypt",
-            "passlib",
             "pydantic>=2.0.0",
-            "netifaces",
-            "statsd",
-            "elasticsearch",
-            "ansible-runner",
+            "passlib",
+            "psutil",
             "docker",
-            "kubernetes",
-            "opentelemetry-api",
-            "opentelemetry-sdk",
-            "opentelemetry-exporter-jaeger",
-            "opentelemetry-exporter-prometheus",
-            "opentelemetry-instrumentation-fastapi",
+            "prometheus_client",
         ]
 
     def setup_virtualenv(self):
@@ -52,67 +47,64 @@ class DependencyManager:
         try:
             # Create virtual environment if it doesn't exist
             if not self.venv_path.exists():
-                print(f"Creating virtual environment at {self.venv_path}...")
+                logger.info(f"Creating virtual environment at {self.venv_path}...")
                 subprocess.check_call([sys.executable, "-m", "venv", str(self.venv_path)])
 
             # Upgrade pip and setuptools
-            print("Upgrading pip and setuptools...")
+            logger.info("Upgrading pip and setuptools...")
             subprocess.check_call([str(self.venv_pip), "install", "--upgrade", "pip", "setuptools", "wheel"])
 
             # Install required packages
-            print("Installing required packages...")
+            logger.info("Installing required Python packages...")
             subprocess.check_call([str(self.venv_pip), "install"] + self.required_packages)
 
         except subprocess.CalledProcessError as e:
-            print(f"Error during virtual environment setup: {e}")
+            logger.error(f"Error during virtual environment setup: {e}")
             sys.exit(1)
 
-        print(f"Virtual environment setup complete. Use {self.venv_python} to run your script.")
+        logger.info(f"Virtual environment setup complete. Use {self.venv_python} to run your script.")
 
-# Initialize and set up virtual environment
+# Initialize and set up the virtual environment
 dependency_manager = DependencyManager()
 dependency_manager.setup_virtualenv()
 
 # Import necessary modules
-import redis
 from redis.asyncio import Redis
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from fastapi import FastAPI
-import uvicorn
-from prometheus_client import start_http_server, Counter, Gauge
-from datetime import datetime
-import asyncio
+from prometheus_client import start_http_server, Counter
 
-# Set up Redis client
+# Redis client setup
 try:
     redis_client = Redis()
-    print("Redis client initialized successfully.")
+    logger.info("Redis client initialized successfully.")
 except Exception as e:
-    print(f"Error initializing Redis client: {e}")
+    logger.error(f"Error initializing Redis client: {e}")
     sys.exit(1)
 
-# SQLAlchemy base and database setup
+# SQLAlchemy setup
 Base = declarative_base()
+engine = create_async_engine("postgresql+asyncpg://vpn_user:vpn_pass@localhost/vpndb", echo=True)
+SessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 async def setup_database():
-    """Configure the database connection."""
+    """Configure the PostgreSQL database."""
     try:
-        engine = create_async_engine("postgresql+asyncpg://user:password@localhost/dbname", echo=True)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        print("Database setup completed.")
+        logger.info("Database setup completed.")
     except Exception as e:
-        print(f"Database setup failed: {e}")
+        logger.error(f"Database setup failed: {e}")
         sys.exit(1)
 
 # Start Prometheus metrics server
 try:
-    start_http_server(8000)
-    print("Prometheus metrics server started on port 8000.")
+    start_http_server(9000)
+    logger.info("Prometheus metrics server started on port 9000.")
 except Exception as e:
-    print(f"Error starting Prometheus metrics server: {e}")
+    logger.error(f"Error starting Prometheus metrics server: {e}")
     sys.exit(1)
 
 # Define FastAPI app
@@ -120,80 +112,47 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello, World!"}
+    return {"message": "IKEv2/IPsec VPN Server is running."}
 
-if __name__ == "__main__":
-    # Run the FastAPI app
+# Install and configure IKEv2/IPsec with strongSwan
+def configure_ipsec():
+    """Install and configure IKEv2/IPsec using strongSwan."""
     try:
+        logger.info("Installing strongSwan...")
+        subprocess.check_call(["sudo", "apt", "install", "-y", "strongswan", "strongswan-pki", "libstrongswan-extra-plugins"])
+
+        logger.info("Configuring strongSwan for IKEv2/IPsec...")
+        # Example: Create necessary directories and keys for strongSwan
+        os.makedirs("/etc/ipsec.d/private", exist_ok=True)
+        os.makedirs("/etc/ipsec.d/certs", exist_ok=True)
+        
+        # Generate VPN server key and certificate
+        subprocess.check_call(["ipsec", "pki", "--gen", "--outform", "pem", "--out", "/etc/ipsec.d/private/server-key.pem"])
+        subprocess.check_call(["ipsec", "pki", "--self", "--in", "/etc/ipsec.d/private/server-key.pem", "--dn", "C=US, O=VPN Server, CN=vpn.example.com", "--ca", "--outform", "pem", "--out", "/etc/ipsec.d/certs/server-cert.pem"])
+
+        # Restart the strongSwan service
+        subprocess.check_call(["systemctl", "restart", "strongswan"])
+        logger.info("IKEv2/IPsec configuration completed successfully.")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error configuring IKEv2/IPsec: {e}")
+        sys.exit(1)
+
+# Main function
+if __name__ == "__main__":
+    try:
+        logger.info("Starting IKEv2/IPsec installation and configuration...")
+        configure_ipsec()
+
+        logger.info("Setting up the database...")
+        asyncio.run(setup_database())
+
+        logger.info("Starting FastAPI application...")
+        import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8000)
     except Exception as e:
-        print(f"Error running FastAPI application: {e}")
+        logger.error(f"Error during execution: {e}")
         sys.exit(1)
-
-    def setup(self):
-        """Set up virtual environment and install packages."""
-        try:
-            # Create virtual environment
-            if not os.path.exists(self.venv_path):
-                print("Creating virtual environment...")
-                venv.create(self.venv_path, with_pip=True)
-
-            # Get virtual environment paths
-            venv_python = os.path.join(self.venv_path, 'bin', 'python')
-            venv_pip = os.path.join(self.venv_path, 'bin', 'pip')
-
-            # Upgrade core packages
-            subprocess.run([venv_pip, 'install', '--upgrade', 'pip'], check=True)
-            subprocess.run([venv_pip, 'install', '--upgrade', 'wheel'], check=True)
-            subprocess.run([venv_pip, 'install', '--upgrade', 'setuptools>=45.0.0'], check=True)
-
-            # Install required packages
-            for package in self.required_packages:
-                print(f"Installing {package}...")
-                try:
-                    subprocess.run([venv_pip, 'install', '--no-cache-dir', package], check=True)
-                except subprocess.CalledProcessError as e:
-                    print(f"Error installing {package}: {e}")
-                    return False
-
-            # Create runner script
-            self._create_runner_script()
-            
-            return True
-
-        except Exception as e:
-            print(f"Virtual environment setup failed: {e}")
-            return False
-
-    def _create_runner_script(self):
-        """Create shell script for running the main program."""
-        runner_script = "run_main.sh"
-        with open(runner_script, 'w') as f:
-            f.write(f"""#!/bin/bash
-source {os.path.join(self.venv_path, 'bin/activate')}
-python3 "$@"
-""")
-        
-        # Make runner script executable
-        os.chmod(runner_script, 0o755)
-
-def main():
-    """Main setup function."""
-    # Check root privileges
-    check_root()
-
-    # Install system dependencies
-    if not install_system_dependencies():
-        print("Failed to install system dependencies. Exiting.")
-        sys.exit(1)
-
-    # Setup virtual environment
-    venv_manager = VirtualEnvManager()
-    if not venv_manager.setup():
-        print("Failed to setup virtual environment. Exiting.")
-        sys.exit(1)
-
-    print("\nSetup complete! To run the main script, use: ./run_main.sh your_script.py")
 
 # Base configuration class
 class BaseConfig:
