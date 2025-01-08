@@ -1,11 +1,45 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import subprocess
+import sys
 
-# Core dependencies
+def install_pip():
+    """Ensure pip is installed."""
+    try:
+        subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
+    except Exception as e:
+        print(f"Failed to ensure pip: {e}")
+        subprocess.check_call(["sudo", "apt-get", "install", "-y", "python3-pip"])
+        subprocess.check_call(["pip3", "install", "--upgrade", "pip"])
+
+def install_package(package_name):
+    """Install a Python package."""
+    try:
+        __import__(package_name)
+        print(f"{package_name} is already installed.")
+    except ImportError:
+        print(f"{package_name} is not installed. Installing now...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install {package_name}: {e}")
+            sys.exit(1)
+
+# Ensure pip is available
+install_pip()
+
+# Install required packages
+required_packages = [
+    "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
+    "prometheus_client", "psutil", "aioredis", "cryptography", 
+    "bcrypt", "passlib", "pydantic", "netifaces"
+]
+for module in required_packages:
+    install_package(module)
+
 import yaml
+import toml
 import json
 import uuid
 import socket
@@ -87,35 +121,8 @@ from elasticsearch import AsyncElasticsearch
 import opentelemetry
 from opentelemetry import trace
 from opentelemetry.exporter import jaeger
+
 def install_pip():
-    """Ensure pip is installed."""
-    try:
-        subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
-    except Exception:
-        subprocess.check_call(["sudo", "apt-get", "install", "-y", "python3-pip"])
-        subprocess.check_call(["pip3", "install", "--upgrade", "pip"])
-
-def install_package(package_name):
-    """Install a Python package."""
-    try:
-        __import__(package_name)
-    except ImportError:
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        except Exception as e:
-            print(f"Failed to install {package_name}: {e}")
-            sys.exit(1)
-
-# Ensure pip is available
-install_pip()
-
-# Install required packages
-required_packages = ["toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
-                     "prometheus_client", "psutil", "aioredis", "cryptography", 
-                     "bcrypt", "passlib", "pydantic", "netifaces"]
-for module in required_packages:
-    install_package(module)
-
 # Configuration and Environment Setup
 def check_root():
     """Check if script is running as root."""
