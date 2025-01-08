@@ -1,8 +1,46 @@
 #!/usr/bin/env python3
 
 import os
-import subprocess
-import sys
+
+def fix_aioredis_dependency():
+    """
+    Fixes issues related to the 'aioredis' dependency by ensuring a compatible version is installed.
+    Falls back to 'redis-py' if 'aioredis' issues persist.
+    """
+    import subprocess
+    import sys
+
+    def run_command(command, description):
+        """Helper function to run a shell command and handle errors."""
+        try:
+            print(f"Attempting: {description}")
+            subprocess.check_call(command, stdout=sys.stdout, stderr=sys.stderr)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {description} failed with error {e}.")
+            return False
+        return True
+
+    try:
+        # Check if aioredis is installed
+        print("Checking for 'aioredis'...")
+        import aioredis
+        print(f"'aioredis' is already installed (version: {aioredis.__version__}).")
+        
+        # If aioredis is version 2.x or newer, warn about potential conflicts
+        if int(aioredis.__version__.split('.')[0]) >= 2:
+            print("Detected aioredis >= 2.x. Attempting to fix version conflicts...")
+            run_command([sys.executable, "-m", "pip", "uninstall", "-y", "aioredis"], "Uninstall aioredis")
+            run_command([sys.executable, "-m", "pip", "install", "aioredis==1.3.1"], "Install aioredis 1.3.1")
+
+    except ImportError:
+        print("'aioredis' is not installed. Installing a compatible version...")
+        if not run_command([sys.executable, "-m", "pip", "install", "aioredis==1.3.1"], "Install aioredis 1.3.1"):
+            print("Falling back to 'redis-py' due to issues with 'aioredis' installation.")
+            run_command([sys.executable, "-m", "pip", "install", "redis"], "Install redis-py")
+            print("Ensure the code uses 'redis-py' instead of 'aioredis'.")
+
+    except Exception as e:
+        print(f"Unexpected error while fixing 'aioredis': {e}")
 
 def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", packages=None):
     """
