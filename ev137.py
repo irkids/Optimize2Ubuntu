@@ -122,8 +122,6 @@ import opentelemetry
 from opentelemetry import trace
 from opentelemetry.exporter import jaeger
 
-def install_pip():
-# Configuration and Environment Setup
 def check_root():
     """Check if the script is running as root."""
     if os.geteuid() != 0:
