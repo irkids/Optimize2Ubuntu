@@ -34,7 +34,9 @@ required_packages = [
     "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
     "prometheus_client", "psutil", "aioredis", "cryptography", 
     "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", "opentelemetry", "ansible_runner", 
-    "docker", "kubernetes"
+    "docker", "kubernetes", "opentelemetry-api", "opentelemetry-sdk", 
+    "opentelemetry-exporter-jaeger", "opentelemetry-exporter-prometheus", 
+    "opentelemetry-instrumentation-fastapi"
 ]
 for module in required_packages:
     install_package(module)
@@ -90,6 +92,7 @@ import asyncpg
 from functools import lru_cache
 import json
 
+from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 # API and Web Frameworks
