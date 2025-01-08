@@ -4,40 +4,56 @@ import os
 import subprocess
 import sys
 
-def install_pip():
-    """Ensure pip is installed."""
+def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", packages=None):
+    """
+    Ensures the script runs in a virtual environment and installs required packages.
+    If the virtual environment doesn't exist, it will be created automatically.
+
+    Args:
+        venv_path (str): Path to the virtual environment.
+        packages (list): List of packages to install in the virtual environment.
+    """
+    packages = packages or []  # Use an empty list if packages are not provided
+
     try:
-        subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
-    except Exception as e:
-        print(f"Failed to ensure pip: {e}")
-        subprocess.check_call(["sudo", "apt-get", "install", "-y", "python3-pip"])
-        subprocess.check_call(["pip3", "install", "--upgrade", "pip"])
+        # Check if virtual environment exists
+        if not os.path.exists(venv_path):
+            print(f"Creating virtual environment at {venv_path}...")
+            subprocess.check_call([sys.executable, "-m", "venv", venv_path])
 
-def install_package(package_name):
-    """Install a Python package."""
-    try:
-        __import__(package_name)
-        print(f"{package_name} is already installed.")
-    except ImportError:
-        print(f"{package_name} is not installed. Installing now...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to install {package_name}: {e}")
-            sys.exit(1)
+        # Activate the virtual environment
+        venv_python = os.path.join(venv_path, "bin", "python")
+        venv_pip = os.path.join(venv_path, "bin", "pip")
 
-# Ensure pip is available
-install_pip()
+        # Upgrade pip and setuptools inside the virtual environment
+        print("Upgrading pip and setuptools...")
+        subprocess.check_call([venv_pip, "install", "--upgrade", "pip", "setuptools"])
 
-# Install required packages
-required_packages = [
-    "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
-    "prometheus_client", "psutil", "aioredis", "cryptography", 
-    "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", "ansible_runner", 
-    "docker", "kubernetes", "opentelemetry-api", "opentelemetry-sdk",
-    "opentelemetry-exporter-jaeger", "opentelemetry-exporter-prometheus", 
-    "opentelemetry-instrumentation-fastapi"
-]
+        # Install required packages
+        if packages:
+            print(f"Installing required packages: {', '.join(packages)}")
+            subprocess.check_call([venv_pip, "install"] + packages)
+
+        print(f"Virtual environment setup completed. Use {venv_python} to run your script.")
+        return venv_python
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error during virtual environment setup: {e}")
+        sys.exit(1)
+
+# Ensure the script runs in a virtual environment with all dependencies installed
+venv_python = setup_virtualenv_and_install_requirements(
+    venv_path="/opt/my_module_venv",  # Customize the path as needed
+    packages=[
+        "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
+        "prometheus_client", "psutil", "aioredis", "cryptography", 
+        "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", 
+        "ansible_runner", "docker", "kubernetes", "opentelemetry-api", 
+        "opentelemetry-sdk", "opentelemetry-exporter-jaeger", 
+        "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
+    ]
+)
+
 for module in required_packages:
     install_package(module)
 
