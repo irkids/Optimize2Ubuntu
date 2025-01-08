@@ -76,7 +76,6 @@ venv_python = setup_virtualenv_and_install_requirements(
 )
 
 import yaml
-import toml
 import json
 import uuid
 import socket
