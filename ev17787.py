@@ -21,10 +21,10 @@ def ensure_sqlalchemy_installed():
 # Call the function to ensure SQLAlchemy is installed
 ensure_sqlalchemy_installed()
 
-def fix_aioredis_dependency():
+def fix_redis_dependency():
     """
-    Fixes issues related to the 'aioredis' dependency by ensuring a compatible version is installed.
-    Falls back to 'redis-py' if 'aioredis' issues persist.
+    Fixes issues related to the 'redis' dependency by ensuring a compatible version is installed.
+    Falls back to 'redis-py' if 'redis' issues persist.
     """
     import subprocess
     import sys
@@ -40,26 +40,27 @@ def fix_aioredis_dependency():
         return True
 
     try:
-        # Check if aioredis is installed
-        print("Checking for 'aioredis'...")
-        import aioredis
-        print(f"'aioredis' is already installed (version: {aioredis.__version__}).")
+        # Check if redis is installed
+        print("Checking for 'redis'...")
+        from redis.asyncio import Redis
+        redis_client = Redis()
+        print(f"'redis' is already installed (version: {redis.__version__}).")
         
-        # If aioredis is version 2.x or newer, warn about potential conflicts
-        if int(aioredis.__version__.split('.')[0]) >= 2:
-            print("Detected aioredis >= 2.x. Attempting to fix version conflicts...")
-            run_command([sys.executable, "-m", "pip", "uninstall", "-y", "aioredis"], "Uninstall aioredis")
-            run_command([sys.executable, "-m", "pip", "install", "aioredis==1.3.1"], "Install aioredis 1.3.1")
+        # If redis is version 2.x or newer, warn about potential conflicts
+        if int(redis.__version__.split('.')[0]) >= 2:
+            print("Detected redis >= 2.x. Attempting to fix version conflicts...")
+            run_command([sys.executable, "-m", "pip", "uninstall", "-y", "redis"], "Uninstall redis")
+            run_command([sys.executable, "-m", "pip", "install", "redis==1.3.1"], "Install redis 1.3.1")
 
     except ImportError:
-        print("'aioredis' is not installed. Installing a compatible version...")
-        if not run_command([sys.executable, "-m", "pip", "install", "aioredis==1.3.1"], "Install aioredis 1.3.1"):
-            print("Falling back to 'redis-py' due to issues with 'aioredis' installation.")
+        print("'redis' is not installed. Installing a compatible version...")
+        if not run_command([sys.executable, "-m", "pip", "install", "redis==1.3.1"], "Install redis 1.3.1"):
+            print("Falling back to 'redis-py' due to issues with 'redis' installation.")
             run_command([sys.executable, "-m", "pip", "install", "redis"], "Install redis-py")
-            print("Ensure the code uses 'redis-py' instead of 'aioredis'.")
+            print("Ensure the code uses 'redis-py' instead of 'redis'.")
 
     except Exception as e:
-        print(f"Unexpected error while fixing 'aioredis': {e}")
+        print(f"Unexpected error while fixing 'redis': {e}")
 
 def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", packages=None):
     """
@@ -126,11 +127,11 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
 
 # Define the list of required Python packages
 required_packages = [
-    "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn",
-    "prometheus_client", "psutil", "aioredis", "cryptography",
-    "bcrypt", "passlib", "pydantic", "netifaces", "statsd",
-    "elasticsearch", "ansible-runner", "docker", "kubernetes",
-    "opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger",
+    "redis", "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
+    "prometheus_client", "psutil", "cryptography", "bcrypt", 
+    "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", 
+    "ansible-runner", "docker", "kubernetes", "opentelemetry-api", 
+    "opentelemetry-sdk", "opentelemetry-exporter-jaeger", 
     "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
 ]
 
@@ -154,7 +155,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 import asyncpg
-import aioredis
+from redis.asyncio import Redis
+redis_client = Redis()
 import asyncio
 import logging
 from datetime import datetime
@@ -163,7 +165,8 @@ from prometheus_client import Counter, Gauge, Histogram
 import ansible_runner
 import yaml
 import json
-import aioredis
+from redis.asyncio import Redis
+redis_client = Redis()
 import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -274,7 +277,7 @@ class VirtualEnvManager:
             'pytest>=6.2.0',
             'pytest-asyncio>=0.16.0',
             'hypothesis>=6.24.0',
-            'aioredis>=2.0.0',
+            'redis>=2.0.0',
             'cryptography>=36.0.0',
             'bcrypt>=3.2.0',
             'passlib>=1.7.4',
