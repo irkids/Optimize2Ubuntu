@@ -33,8 +33,8 @@ install_pip()
 required_packages = [
     "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
     "prometheus_client", "psutil", "aioredis", "cryptography", 
-    "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", "opentelemetry", "ansible_runner", 
-    "docker", "kubernetes", "opentelemetry-api", "opentelemetry-sdk", 
+    "bcrypt", "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", "ansible_runner", 
+    "docker", "kubernetes", "opentelemetry-api", "opentelemetry-sdk",
     "opentelemetry-exporter-jaeger", "opentelemetry-exporter-prometheus", 
     "opentelemetry-instrumentation-fastapi"
 ]
