@@ -52,6 +52,14 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
             print(f"Installing required packages: {', '.join(packages)}")
             subprocess.check_call([venv_python, "-m", "pip", "install"] + packages)
 
+        # Verify installed packages
+        print("Verifying installed packages...")
+        installed_packages = subprocess.check_output([venv_python, "-m", "pip", "freeze"]).decode("utf-8")
+        for package in packages:
+            if package.lower() not in installed_packages.lower():
+                print(f"Error: Package '{package}' was not installed. Please check your internet connection or package names.")
+                sys.exit(1)
+
         print(f"Virtual environment setup completed. Use {venv_python} to run your script.")
         return venv_python
 
@@ -69,9 +77,8 @@ required_packages = [
     "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
 ]
 
-# Ensure the virtual environment and required packages are installed
 venv_python = setup_virtualenv_and_install_requirements(
-    venv_path="/opt/my_module_venv",  # Virtual environment path
+    venv_path="/opt/my_module_venv",
     packages=required_packages
 )
 
