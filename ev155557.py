@@ -56,8 +56,21 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
         print(f"Error during virtual environment setup: {e}")
         sys.exit(1)
 
-for module in required_packages:
-    install_package(module)
+# Define the list of required Python packages
+required_packages = [
+    "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn",
+    "prometheus_client", "psutil", "aioredis", "cryptography",
+    "bcrypt", "passlib", "pydantic", "netifaces", "statsd",
+    "elasticsearch", "ansible_runner", "docker", "kubernetes",
+    "opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger",
+    "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
+]
+
+# Ensure the virtual environment and required packages are installed
+venv_python = setup_virtualenv_and_install_requirements(
+    venv_path="/opt/my_module_venv",  # Virtual environment path
+    packages=required_packages
+)
 
 import yaml
 import toml
