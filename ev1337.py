@@ -33,7 +33,8 @@ install_pip()
 required_packages = [
     "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
     "prometheus_client", "psutil", "aioredis", "cryptography", 
-    "bcrypt", "passlib", "pydantic", "netifaces"
+    "bcrypt", "passlib", "pydantic", "netifaces", "ansible_runner", 
+    "docker", "kubernetes"
 ]
 for module in required_packages:
     install_package(module)
