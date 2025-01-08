@@ -3,287 +3,132 @@
 import os
 import subprocess
 import sys
+import shutil
+from pathlib import Path
 
-def ensure_sqlalchemy_installed():
-    """
-    Ensures that SQLAlchemy is installed in the virtual environment.
-    """
-    try:
-        # Try importing sqlalchemy
-        import sqlalchemy
-        print(f"SQLAlchemy is already installed (version: {sqlalchemy.__version__}).")
-    except ImportError:
-        # Install sqlalchemy if not found
-        print("SQLAlchemy not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "sqlalchemy"])
-        print("SQLAlchemy installed successfully.")
-
-# Call the function to ensure SQLAlchemy is installed
-ensure_sqlalchemy_installed()
-
-def fix_redis_dependency():
-    """
-    Fixes issues related to the 'redis' dependency by ensuring a compatible version is installed.
-    Falls back to 'redis-py' if 'redis' issues persist.
-    """
-    import subprocess
-    import sys
-
-    def run_command(command, description):
-        """Helper function to run a shell command and handle errors."""
-        try:
-            print(f"Attempting: {description}")
-            subprocess.check_call(command, stdout=sys.stdout, stderr=sys.stderr)
-        except subprocess.CalledProcessError as e:
-            print(f"Error: {description} failed with error {e}.")
-            return False
-        return True
-
-    try:
-        # Check if redis is installed
-        print("Checking for 'redis'...")
-        from redis.asyncio import Redis
-        redis_client = Redis()
-        print(f"'redis' is already installed (version: {redis.__version__}).")
-        
-        # If redis is version 2.x or newer, warn about potential conflicts
-        if int(redis.__version__.split('.')[0]) >= 2:
-            print("Detected redis >= 2.x. Attempting to fix version conflicts...")
-            run_command([sys.executable, "-m", "pip", "uninstall", "-y", "redis"], "Uninstall redis")
-            run_command([sys.executable, "-m", "pip", "install", "redis==1.3.1"], "Install redis 1.3.1")
-
-    except ImportError:
-        print("'redis' is not installed. Installing a compatible version...")
-        if not run_command([sys.executable, "-m", "pip", "install", "redis==1.3.1"], "Install redis 1.3.1"):
-            print("Falling back to 'redis-py' due to issues with 'redis' installation.")
-            run_command([sys.executable, "-m", "pip", "install", "redis"], "Install redis-py")
-            print("Ensure the code uses 'redis-py' instead of 'redis'.")
-
-    except Exception as e:
-        print(f"Unexpected error while fixing 'redis': {e}")
-
-def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", packages=None):
-    """
-    Ensures the script runs in a virtual environment and installs required packages.
-    If the virtual environment doesn't exist, it will be created automatically.
-
-    Args:
-        venv_path (str): Path to the virtual environment.
-        packages (list): List of packages to install in the virtual environment.
-    """
-    import shutil
-
-    packages = packages or []  # Use an empty list if packages are not provided
-
-    try:
-        # Ensure python3-venv is installed
-        if not shutil.which("apt"):
-            print("Error: This script requires a Debian-based system with 'apt' package manager.")
-            sys.exit(1)
-
-        print("Ensuring python3-venv is installed...")
-        subprocess.check_call(["sudo", "apt", "install", "-y", "python3-venv"])
-
-        # Check if virtual environment exists
-        if not os.path.exists(venv_path):
-            print(f"Creating virtual environment at {venv_path}...")
-            subprocess.check_call([sys.executable, "-m", "venv", venv_path])
-
-        # Activate the virtual environment
-        venv_python = os.path.join(venv_path, "bin", "python")
-        venv_pip = os.path.join(venv_path, "bin", "pip")
-
-        # Ensure pip exists in the virtual environment
-        if not os.path.exists(venv_pip):
-            print("pip is missing in the virtual environment. Installing pip...")
-            # Use ensurepip to install pip if it's missing
-            subprocess.check_call([venv_python, "-m", "ensurepip", "--upgrade"])
-            # Explicitly upgrade pip after ensurepip
-            subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip"])
-
-        # Upgrade pip and setuptools inside the virtual environment
-        print("Upgrading pip and setuptools...")
-        subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip", "setuptools"])
-
-        # Install required packages
-        if packages:
-            print(f"Installing required packages: {', '.join(packages)}")
-            subprocess.check_call([venv_python, "-m", "pip", "install"] + packages)
-
-        # Verify installed packages
-        print("Verifying installed packages...")
-        installed_packages = subprocess.check_output([venv_python, "-m", "pip", "freeze"]).decode("utf-8")
-        for package in packages:
-            if package.lower() not in installed_packages.lower():
-                print(f"Error: Package '{package}' was not installed. Please check your internet connection or package names.")
-                sys.exit(1)
-
-        print(f"Virtual environment setup completed. Use {venv_python} to run your script.")
-        return venv_python
-
-    except subprocess.CalledProcessError as e:
-        print(f"Error during virtual environment setup: {e}")
-        sys.exit(1)
-
-# Define the list of required Python packages
-required_packages = [
-    "redis", "toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", 
-    "prometheus_client", "psutil", "cryptography", "bcrypt", 
-    "passlib", "pydantic", "netifaces", "statsd", "elasticsearch", 
-    "ansible-runner", "docker", "kubernetes", "opentelemetry-api", 
-    "opentelemetry-sdk", "opentelemetry-exporter-jaeger", 
-    "opentelemetry-exporter-prometheus", "opentelemetry-instrumentation-fastapi"
-]
-
-venv_python = setup_virtualenv_and_install_requirements(
-    venv_path="/opt/my_module_venv",
-    packages=required_packages
-)
-
-import yaml
-import json
-import uuid
-import socket
-import inspect
-import threading
-import ipaddress
-import multiprocessing
-import ssl
-
-# Database and ORM
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship
-import asyncpg
-from redis.asyncio import Redis
-redis_client = Redis()
-import asyncio
-import logging
-from datetime import datetime
-from typing import Dict, List, Optional
-from prometheus_client import Counter, Gauge, Histogram
-import ansible_runner
-import yaml
-import json
-from redis.asyncio import Redis
-redis_client = Redis()
-import asyncpg
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-# Enhanced Database Models and ORM Configuration with PostgreSQL Optimizations
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text, 
-    ForeignKey, BigInteger, Float, Index, text
-)
-from datetime import datetime, timedelta
-import uuid
-import logging
-import asyncio
-from prometheus_client import Counter, Gauge, Histogram
-from typing import Optional, Dict, List, Any
-import asyncpg
-from functools import lru_cache
-import json
-
-from sqlalchemy.orm import declarative_base
-Base = declarative_base()
-
-# API and Web Frameworks
-from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
-
-# Security and Cryptography
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization, padding
-from cryptography.hazmat.primitives.asymmetric import rsa, padding as asymmetric_padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-from cryptography.x509.oid import NameOID
-from cryptography.fernet import Fernet
-import bcrypt
-from passlib import hash as passlib_hash
-import jwt
-
-# Monitoring and Metrics
-import psutil
-import resource
-import netifaces
-from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
-import statsd
-from elasticsearch import AsyncElasticsearch
-import opentelemetry
-from opentelemetry import trace
-from opentelemetry.exporter import jaeger
-
+# Ensure the script is run as root
 def check_root():
     """Check if the script is running as root."""
     if os.geteuid() != 0:
         print("This script must be run as root!")
         sys.exit(1)
 
+check_root()
 
-def install_system_dependencies():
-    """Install required system packages."""
-    try:
-        # Update package list
-        subprocess.run(['apt-get', 'update'], check=True)
-        
-        # Essential system packages
-        system_packages = [
-            'python3-dev',
-            'python3-venv',
-            'build-essential',
-            'libpq-dev',
-            'gcc',
-            'git',
-            'curl',
-            'wget',
-            'intel-microcode',
-            'intel-qat-udev'
-        ]
-        
-        subprocess.run(['apt-get', 'install', '-y'] + system_packages, check=True)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error installing system dependencies: {e}")
-        return False
-
-class VirtualEnvManager:
-    """Manage Python virtual environment setup and package installation."""
-    
-    def __init__(self):
-        self.venv_path = '/opt/script_venv'
+# Dependency and virtual environment management
+class DependencyManager:
+    def __init__(self, venv_path="/opt/my_module_venv"):
+        self.venv_path = Path(venv_path)
+        self.venv_python = self.venv_path / "bin" / "python"
+        self.venv_pip = self.venv_path / "bin" / "pip"
         self.required_packages = [
-            'wheel>=0.37.0',
-            'setuptools>=45.0.0',
-            'pip>=21.0.0',
-            'asyncpg>=0.25.0',
-            'sqlalchemy>=1.4.0',
-            'alembic>=1.7.0',
-            'fastapi>=0.70.0',
-            'uvicorn>=0.15.0',
-            'psutil>=5.8.0',
-            'prometheus_client>=0.12.0',
-            'kubernetes>=18.20.0',
-            'docker>=5.0.0',
-            'pytest>=6.2.0',
-            'pytest-asyncio>=0.16.0',
-            'hypothesis>=6.24.0',
-            'redis>=2.0.0',
-            'cryptography>=36.0.0',
-            'bcrypt>=3.2.0',
-            'passlib>=1.7.4',
-            'pydantic>=1.8.0',
-            'netifaces>=0.11.0'
+            "redis>=5.2.0",
+            "toml",
+            "asyncpg>=0.30.0",
+            "sqlalchemy>=2.0.0",
+            "fastapi>=0.95.0",
+            "uvicorn>=0.34.0",
+            "prometheus_client",
+            "psutil",
+            "cryptography",
+            "bcrypt",
+            "passlib",
+            "pydantic>=2.0.0",
+            "netifaces",
+            "statsd",
+            "elasticsearch",
+            "ansible-runner",
+            "docker",
+            "kubernetes",
+            "opentelemetry-api",
+            "opentelemetry-sdk",
+            "opentelemetry-exporter-jaeger",
+            "opentelemetry-exporter-prometheus",
+            "opentelemetry-instrumentation-fastapi",
         ]
+
+    def setup_virtualenv(self):
+        """Set up a Python virtual environment and install dependencies."""
+        try:
+            # Create virtual environment if it doesn't exist
+            if not self.venv_path.exists():
+                print(f"Creating virtual environment at {self.venv_path}...")
+                subprocess.check_call([sys.executable, "-m", "venv", str(self.venv_path)])
+
+            # Upgrade pip and setuptools
+            print("Upgrading pip and setuptools...")
+            subprocess.check_call([str(self.venv_pip), "install", "--upgrade", "pip", "setuptools", "wheel"])
+
+            # Install required packages
+            print("Installing required packages...")
+            subprocess.check_call([str(self.venv_pip), "install"] + self.required_packages)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error during virtual environment setup: {e}")
+            sys.exit(1)
+
+        print(f"Virtual environment setup complete. Use {self.venv_python} to run your script.")
+
+# Initialize and set up virtual environment
+dependency_manager = DependencyManager()
+dependency_manager.setup_virtualenv()
+
+# Import necessary modules
+import redis
+from redis.asyncio import Redis
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from fastapi import FastAPI
+import uvicorn
+from prometheus_client import start_http_server, Counter, Gauge
+from datetime import datetime
+import asyncio
+
+# Set up Redis client
+try:
+    redis_client = Redis()
+    print("Redis client initialized successfully.")
+except Exception as e:
+    print(f"Error initializing Redis client: {e}")
+    sys.exit(1)
+
+# SQLAlchemy base and database setup
+Base = declarative_base()
+
+async def setup_database():
+    """Configure the database connection."""
+    try:
+        engine = create_async_engine("postgresql+asyncpg://user:password@localhost/dbname", echo=True)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database setup completed.")
+    except Exception as e:
+        print(f"Database setup failed: {e}")
+        sys.exit(1)
+
+# Start Prometheus metrics server
+try:
+    start_http_server(8000)
+    print("Prometheus metrics server started on port 8000.")
+except Exception as e:
+    print(f"Error starting Prometheus metrics server: {e}")
+    sys.exit(1)
+
+# Define FastAPI app
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"message": "Hello, World!"}
+
+if __name__ == "__main__":
+    # Run the FastAPI app
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    except Exception as e:
+        print(f"Error running FastAPI application: {e}")
+        sys.exit(1)
 
     def setup(self):
         """Set up virtual environment and install packages."""
