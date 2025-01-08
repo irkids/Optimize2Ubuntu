@@ -4,6 +4,23 @@ import os
 import subprocess
 import sys
 
+def ensure_sqlalchemy_installed():
+    """
+    Ensures that SQLAlchemy is installed in the virtual environment.
+    """
+    try:
+        # Try importing sqlalchemy
+        import sqlalchemy
+        print(f"SQLAlchemy is already installed (version: {sqlalchemy.__version__}).")
+    except ImportError:
+        # Install sqlalchemy if not found
+        print("SQLAlchemy not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "sqlalchemy"])
+        print("SQLAlchemy installed successfully.")
+
+# Call the function to ensure SQLAlchemy is installed
+ensure_sqlalchemy_installed()
+
 def fix_aioredis_dependency():
     """
     Fixes issues related to the 'aioredis' dependency by ensuring a compatible version is installed.
