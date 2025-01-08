@@ -13,9 +13,19 @@ def setup_virtualenv_and_install_requirements(venv_path="/tmp/my_module_venv", p
         venv_path (str): Path to the virtual environment.
         packages (list): List of packages to install in the virtual environment.
     """
+    import shutil
+
     packages = packages or []  # Use an empty list if packages are not provided
 
     try:
+        # Ensure python3-venv is installed
+        if not shutil.which("apt"):
+            print("Error: This script requires a Debian-based system with 'apt' package manager.")
+            sys.exit(1)
+
+        print("Ensuring python3-venv is installed...")
+        subprocess.check_call(["sudo", "apt", "install", "-y", "python3-venv"])
+
         # Check if virtual environment exists
         if not os.path.exists(venv_path):
             print(f"Creating virtual environment at {venv_path}...")
