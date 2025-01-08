@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import subprocess
+import sys
+
+def install_package(package_name):
+    try:
+        __import__(package_name)
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+
+# Install required modules
+required_modules = ["toml", "asyncpg", "sqlalchemy", "fastapi", "uvicorn", "prometheus_client",
+                    "psutil", "aioredis", "cryptography", "bcrypt", "passlib", "pydantic", "netifaces"]
+for module in required_modules:
+    install_package(module)
 import venv
 import asyncio
 import logging
