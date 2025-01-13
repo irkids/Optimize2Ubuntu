@@ -48,20 +48,27 @@ fi
 # Install Node.js
 install_nodejs
 
-# Create fresh directory
+# Create temporary directory for React project
+TEMP_DIR=$(mktemp -d)
+log "Creating temporary React project..."
+cd "$TEMP_DIR" || error "Failed to change to temp directory"
+yarn create react-app irssh-panel --template typescript || error "Failed to create React project"
+
+# Create panel directory
 log "Creating installation directory..."
 mkdir -p "$PANEL_DIR/scripts"
-cd "$PANEL_DIR" || error "Failed to change directory"
 
 # Download IKEv2 script
 log "Downloading IKEv2 script..."
-curl -o scripts/ikev2.py "$SCRIPT_URL" || error "Failed to download IKEv2 script"
-chmod +x scripts/ikev2.py
-sed -i 's/\r$//' scripts/ikev2.py
+curl -o "$PANEL_DIR/scripts/ikev2.py" "$SCRIPT_URL" || error "Failed to download IKEv2 script"
+chmod +x "$PANEL_DIR/scripts/ikev2.py"
+sed -i 's/\r$//' "$PANEL_DIR/scripts/ikev2.py"
 
-# Create React project
-log "Creating React project..."
-yarn create react-app . --template typescript || error "Failed to create React project"
+# Move React project files
+log "Moving React project files..."
+mv "$TEMP_DIR/irssh-panel/"* "$TEMP_DIR/irssh-panel/".* "$PANEL_DIR/" 2>/dev/null || true
+cd "$PANEL_DIR" || error "Failed to change directory"
+rm -rf "$TEMP_DIR"
 
 # Install dependencies
 log "Installing dependencies..."
