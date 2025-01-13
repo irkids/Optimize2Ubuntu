@@ -4,7 +4,7 @@
 # Install script for IRSSH Panel with IKEv2 integration
 
 # Configuration
-GITHUB_REPO="https://github.com/irkids/Optimize2Ubuntu/ikev2-script.git"
+SCRIPT_URL="https://raw.githubusercontent.com/irkids/Optimize2Ubuntu/refs/heads/main/ikev2-script.py"
 PANEL_DIR="/opt/irssh-panel"
 LOG_FILE="install.log"
 
@@ -31,16 +31,22 @@ fi
 # Install system dependencies
 log "Installing system dependencies..."
 apt-get update || error "Failed to update package lists"
-apt-get install -y git nodejs npm strongswan || error "Failed to install dependencies"
+apt-get install -y nodejs npm strongswan python3 curl || error "Failed to install dependencies"
 
 # Create installation directory
 log "Creating installation directory..."
-mkdir -p $PANEL_DIR
+mkdir -p $PANEL_DIR/scripts
 cd $PANEL_DIR || error "Failed to create installation directory"
 
-# Clone IKEv2 script from GitHub
-log "Cloning IKEv2 script..."
-git clone $GITHUB_REPO scripts/ikev2 || error "Failed to clone IKEv2 script"
+# Download IKEv2 script
+log "Downloading IKEv2 script..."
+curl -o scripts/ikev2.py "$SCRIPT_URL" || error "Failed to download IKEv2 script"
+chmod +x scripts/ikev2.py
+
+# Make script executable and convert line endings
+log "Setting up IKEv2 script..."
+sed -i 's/\r$//' scripts/ikev2.py
+chown root:root scripts/ikev2.py
 
 # Install React project and dependencies
 log "Creating React project..."
@@ -73,12 +79,12 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
-const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2/ikev2.sh';
+const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2.py';
 
 export class IKEv2Manager {
     async addUser(username: string, password: string) {
         try {
-            await execAsync(`sudo ${SCRIPT_PATH} add-user ${username} ${password}`);
+            await execAsync(`sudo python3 ${SCRIPT_PATH} add-user ${username} ${password}`);
             return true;
         } catch (error) {
             console.error('Failed to add user:', error);
@@ -88,7 +94,7 @@ export class IKEv2Manager {
 
     async deleteUser(username: string) {
         try {
-            await execAsync(`sudo ${SCRIPT_PATH} remove-user ${username}`);
+            await execAsync(`sudo python3 ${SCRIPT_PATH} remove-user ${username}`);
             return true;
         } catch (error) {
             console.error('Failed to delete user:', error);
@@ -98,7 +104,7 @@ export class IKEv2Manager {
 
     async listUsers() {
         try {
-            const { stdout } = await execAsync(`sudo ${SCRIPT_PATH} list-users`);
+            const { stdout } = await execAsync(`sudo python3 ${SCRIPT_PATH} list-users`);
             return stdout.trim().split('\n');
         } catch (error) {
             console.error('Failed to list users:', error);
@@ -114,13 +120,13 @@ EOL
 log "Setting up environment variables..."
 cat > .env << EOL
 REACT_APP_API_URL=http://localhost:3000
-REACT_APP_IKEV2_SCRIPT_PATH=/opt/irssh-panel/scripts/ikev2/ikev2.sh
+REACT_APP_IKEV2_SCRIPT_PATH=/opt/irssh-panel/scripts/ikev2.py
 EOL
 
 # Set permissions
 log "Setting permissions..."
 chown -R $SUDO_USER:$SUDO_USER $PANEL_DIR
-chmod +x scripts/ikev2/ikev2.sh
+chmod +x scripts/ikev2.py
 
 # Create systemd service
 log "Creating systemd service..."
