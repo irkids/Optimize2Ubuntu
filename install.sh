@@ -42,8 +42,16 @@ log "Cleaning previous installation..."
 if [ -d "$PANEL_DIR" ]; then
     systemctl stop irssh-panel >/dev/null 2>&1
     systemctl disable irssh-panel >/dev/null 2>&1
-    rm -rf "$PANEL_DIR"
+    rm -rf "$PANEL_DIR"/*  # Remove all directory contents
 fi
+
+# Create React project directly in panel directory
+log "Creating React project..."
+cd "$PANEL_DIR" || error "Failed to change to panel directory"
+yarn create react-app . --template typescript || error "Failed to create React project"
+
+# Then create scripts directory and download IKEv2 script
+mkdir -p "$PANEL_DIR/scripts"
 
 # Install Node.js
 install_nodejs
