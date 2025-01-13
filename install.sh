@@ -1,19 +1,16 @@
 #!/bin/bash
 
-# install.sh
-# Install script for IRSSH Panel with IKEv2 integration
-
 # Configuration
-SCRIPT_URL="https://raw.githubusercontent.com/irkids/Optimize2Ubuntu/refs/heads/main/ikev2-script.py"
 PANEL_DIR="/opt/irssh-panel"
-LOG_FILE="install.log"
+SCRIPT_URL="https://raw.githubusercontent.com/irkids/Optimize2Ubuntu/refs/heads/main/ikev2-script.py"
+LOG_FILE="/root/install.log"
 
-# Colors for output
+# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Logging function
+# Logging
 log() {
     echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a $LOG_FILE
 }
@@ -23,37 +20,43 @@ error() {
     exit 1
 }
 
-# Check if running as root
+# Check root
 if [[ $EUID -ne 0 ]]; then
     error "This script must be run as root"
 fi
 
-# Install system dependencies
-log "Installing system dependencies..."
-apt-get update || error "Failed to update package lists"
-apt-get install -y nodejs npm strongswan python3 curl || error "Failed to install dependencies"
+# Clean previous installation
+log "Cleaning previous installation..."
+if [ -d "$PANEL_DIR" ]; then
+    systemctl stop irssh-panel >/dev/null 2>&1
+    systemctl disable irssh-panel >/dev/null 2>&1
+    rm -rf "$PANEL_DIR"
+fi
 
-# Create installation directory
+# Create fresh directory
 log "Creating installation directory..."
-mkdir -p $PANEL_DIR/scripts
-cd $PANEL_DIR || error "Failed to create installation directory"
+mkdir -p "$PANEL_DIR/scripts"
+cd "$PANEL_DIR" || error "Failed to change directory"
 
 # Download IKEv2 script
 log "Downloading IKEv2 script..."
 curl -o scripts/ikev2.py "$SCRIPT_URL" || error "Failed to download IKEv2 script"
 chmod +x scripts/ikev2.py
-
-# Make script executable and convert line endings
-log "Setting up IKEv2 script..."
 sed -i 's/\r$//' scripts/ikev2.py
-chown root:root scripts/ikev2.py
 
-# Install React project and dependencies
-log "Creating React project..."
-npx create-react-app . --template typescript || error "Failed to create React project"
+# Create temporary React project
+log "Creating temporary React project..."
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR" || error "Failed to change to temp directory"
+npx create-react-app irssh-panel --template typescript || error "Failed to create React project"
 
-# Install additional dependencies
-log "Installing additional dependencies..."
+# Move React project files
+log "Setting up React project..."
+mv irssh-panel/* irssh-panel/.* "$PANEL_DIR" 2>/dev/null || true
+cd "$PANEL_DIR" || error "Failed to change directory"
+
+# Install dependencies
+log "Installing dependencies..."
 npm install \
     @headlessui/react \
     @heroicons/react \
@@ -62,18 +65,33 @@ npm install \
     autoprefixer \
     recharts \
     axios \
-    react-router-dom || error "Failed to install Node dependencies"
+    react-router-dom || error "Failed to install dependencies"
 
-# Initialize Tailwind CSS
-log "Initializing Tailwind CSS..."
-npx tailwindcss init -p
+# Initialize Tailwind
+log "Setting up Tailwind CSS..."
+cat > tailwind.config.js << 'EOL'
+module.exports = {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
+}
+EOL
 
-# Create project structure
+cat > postcss.config.js << 'EOL'
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+EOL
+
+# Setup project structure
 log "Creating project structure..."
 mkdir -p src/{components/{layout,dashboard,users},utils,pages}
 
-# Download and setup components
-log "Setting up components..."
+# Create IKEv2 utility
+log "Setting up IKEv2 integration..."
 cat > src/utils/ikev2.ts << 'EOL'
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -116,8 +134,8 @@ export class IKEv2Manager {
 export default new IKEv2Manager();
 EOL
 
-# Setup environment variables
-log "Setting up environment variables..."
+# Setup environment
+log "Configuring environment..."
 cat > .env << EOL
 REACT_APP_API_URL=http://localhost:3000
 REACT_APP_IKEV2_SCRIPT_PATH=/opt/irssh-panel/scripts/ikev2.py
@@ -125,10 +143,10 @@ EOL
 
 # Set permissions
 log "Setting permissions..."
-chown -R $SUDO_USER:$SUDO_USER $PANEL_DIR
-chmod +x scripts/ikev2.py
+chown -R root:root "$PANEL_DIR"
+chmod -R 755 "$PANEL_DIR"
 
-# Create systemd service
+# Create service
 log "Creating systemd service..."
 cat > /etc/systemd/system/irssh-panel.service << EOL
 [Unit]
@@ -137,7 +155,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=$SUDO_USER
+User=root
 WorkingDirectory=$PANEL_DIR
 ExecStart=/usr/bin/npm start
 Restart=always
@@ -146,20 +164,19 @@ Restart=always
 WantedBy=multi-user.target
 EOL
 
-# Start services
-log "Starting services..."
+# Start service
+log "Starting service..."
 systemctl daemon-reload
 systemctl enable irssh-panel
 systemctl start irssh-panel
 
-# Final setup steps
-log "Performing final setup..."
-cd $PANEL_DIR
-npm run build
+# Clean up
+log "Cleaning up..."
+rm -rf "$TEMP_DIR"
 
-# Print success message
+# Success message
 log "Installation completed successfully!"
-echo -e "${GREEN}The IRSSH Panel has been installed successfully!${NC}"
-echo "You can access the panel at: http://localhost:3000"
+echo -e "${GREEN}IRSSH Panel has been installed!${NC}"
+echo "Access the panel at: http://localhost:3000"
 echo "Installation directory: $PANEL_DIR"
 echo "Log file: $LOG_FILE"
