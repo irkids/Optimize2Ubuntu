@@ -18,10 +18,27 @@ echo -e "${GREEN}Starting IKEv2 Manager installation...${NC}"
 INSTALL_DIR="/opt/ikev2-manager"
 mkdir -p $INSTALL_DIR/{scripts,web,venv}
 
-# Save IKEv2/IPsec script
-# HERE YOU SHOULD PUT YOUR 8789 LINES OF PYTHON CODE FROM ALL.txt
-cat > $INSTALL_DIR/scripts/ikev2_script.py << 'EOL'
+# Install Node.js repositories and update
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    nginx \
+    nodejs \
+    npm
+
+# Create main IKEv2 script file - YOU WILL PUT YOUR CODE HERE
+echo -e "${GREEN}Creating IKEv2 script...${NC}"
+cat > $INSTALL_DIR/scripts/ikev2_script.py << 'EOF'
 #!/usr/bin/env python3
+
+### #!/usr/bin/env python3
 
 import os
 import subprocess
@@ -8809,390 +8826,63 @@ class OptimizationManager:
             
         except Exception as e:
             self.logger.error(f"System optimization failed: {e}")
-            raise
-EOL
+            raise ###
 
-# Create requirements.txt
-# HERE YOU SHOULD PUT YOUR 359 LINES OF REQUIREMENTS
-cat > $INSTALL_DIR/scripts/requirements.txt << 'EOL'
-#!/usr/bin/env python3
+EOF
 
-import os
-import subprocess
-import sys
-import shutil
-from pathlib import Path
-from logging import getLogger, basicConfig, INFO
+# Create requirements file with correct dependencies
+echo -e "${GREEN}Creating requirements file...${NC}"
+cat > $INSTALL_DIR/scripts/requirements.txt << 'EOF'
+redis>=5.2.0
+asyncpg>=0.30.0
+sqlalchemy>=2.0.0
+fastapi>=0.95.0
+uvicorn>=0.34.0
+ansible
+cryptography
+bcrypt
+pydantic>=2.0.0
+passlib
+psutil
+docker
+prometheus_client
+numpy
+pandas
+scipy
+scikit-learn
+tensorflow
+torch
+ray
+kubernetes
+docker
+fastapi
+starlette
+graphql-core
+pytest
+selenium
+prometheus_client
+opentelemetry-api
+opentelemetry-sdk
+jwt
+web3
+EOF
 
-# Set up logging
-basicConfig(level=INFO)
-logger = getLogger("IKEv2 Installer")
-
-# Ensure the script is run as root
-def check_root():
-    """Check if the script is running as root."""
-    if os.geteuid() != 0:
-        logger.error("This script must be run as root!")
-        sys.exit(1)
-
-check_root()
-
-# Dependency and virtual environment management
-class DependencyManager:
-    def __init__(self, venv_path="/opt/my_module_venv"):
-        self.venv_path = Path(venv_path)
-        self.venv_python = self.venv_path / "bin" / "python"
-        self.venv_pip = self.venv_path / "bin" / "pip"
-        self.required_packages = [
-            "redis>=5.2.0",
-            "asyncpg>=0.30.0",
-            "sqlalchemy>=2.0.0",
-            "fastapi>=0.95.0",
-            "uvicorn>=0.34.0",
-            "ansible",
-            "cryptography",
-            "bcrypt",
-            "pydantic>=2.0.0",
-            "passlib",
-            "psutil",
-            "docker",
-            "prometheus_client",
-        ]
-
-    def setup_virtualenv(self):
-        """Set up a Python virtual environment and install dependencies."""
-        try:
-            # Create virtual environment if it doesn't exist
-            if not self.venv_path.exists():
-                logger.info(f"Creating virtual environment at {self.venv_path}...")
-                subprocess.check_call([sys.executable, "-m", "venv", str(self.venv_path)])
-
-            # Upgrade pip and setuptools
-            logger.info("Upgrading pip and setuptools...")
-            subprocess.check_call([str(self.venv_pip), "install", "--upgrade", "pip", "setuptools", "wheel"])
-
-            # Install required packages
-            logger.info("Installing required Python packages...")
-            subprocess.check_call([str(self.venv_pip), "install"] + self.required_packages)
-
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error during virtual environment setup: {e}")
-            sys.exit(1)
-
-        logger.info(f"Virtual environment setup complete. Use {self.venv_python} to run your script.")
-
-# Initialize and set up the virtual environment
-dependency_manager = DependencyManager()
-dependency_manager.setup_virtualenv()
-
-# Standard library imports
-import asyncio
-import inspect
-import ipaddress
-import json
-import multiprocessing
-import ssl
-import socket
-import threading
-import uuid
-from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union, Any
-
-# Data Processing and Analysis
-import numpy as np
-import pandas as pd
-from scipy import stats
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-
-# Deep Learning and AI
-import tensorflow as tf
-import tensorflow_privacy
-from tensorflow_privacy.privacy.optimizers.dp_optimizer import DPGradientDescentGaussianOptimizer
-import torch
-from torch import nn
-import ray
-from ray import serve
-
-# Database and Storage
-import asyncpg
-from asyncpg import Connection, Pool
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
-import redis
-from redis.asyncio import Redis
-from redis.cluster import RedisCluster
-import aioredis
-import cassandra
-from cassandra.cluster import Cluster
-from cassandra.policies import DCAwareRoundRobinPolicy
-import elasticsearch
-from elasticsearch import AsyncElasticsearch
-from opensearch_py import OpenSearch
-import mongodb
-from motor.motor_asyncio import AsyncIOMotorClient
-import clickhouse_driver
-from clickhouse_driver.client import Client as ClickHouseClient
-
-# Message Brokers and Streaming
-import kafka
-from kafka import KafkaProducer, KafkaConsumer
-from kafka.admin import KafkaAdminClient, NewTopic
-import pika
-from pika.adapters.asyncio_connection import AsyncioConnection
-import pulsar
-from pulsar import Client as PulsarClient
-import nats
-from nats.aio.client import Client as NATS
-import apache_beam
-from apache_beam import Pipeline, DoFn, ParDo
-import apache_flink
-from pyflink.datastream import StreamExecutionEnvironment
-import apache_spark
-from pyspark.sql import SparkSession
-
-# Cloud Provider SDKs
-import boto3
-from boto3.session import Session as AWSSession
-from botocore.exceptions import ClientError
-from google.cloud import (
-    storage,
-    compute_engine,
-    container,
-    kms,
-    secretmanager,
-    functions_v1,
-    monitoring_v3
-)
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.keys import KeyClient
-from azure.keyvault.secrets import SecretClient
-from azure.mgmt.compute import ComputeManagementClient
-from azure.mgmt.network import NetworkManagementClient
-from azure.monitor import MonitorClient
-from azure.storage.blob import BlobServiceClient
-from azure.iot.device import IoTHubDeviceClient
-
-# Infrastructure and Orchestration
-import kubernetes
-from kubernetes import client, config, watch
-from kubernetes.client import ApiClient
-import docker
-from docker import DockerClient, from_env
-from docker.models.containers import Container
-import helm
-from helm import Helm
-from helm.repo import ChartRepo
-import istio_api
-from istio_api import networking
-import envoy
-from envoy.config.route.v3 import route_components
-import terraform
-from terraform.backend import RemoteBackend
-from terraform.tfstate import Tfstate
-import pulumi
-import pulumi.automation as auto
-from pulumi import ResourceOptions
-import ansible_runner
-import nomad
-from nomad import Nomad
-
-# Service Mesh and Service Discovery
-import consul
-from consul import Consul
-from consul.aio import Consul as AsyncConsul
-import cilium
-from cilium_api import NetworkPolicy
-import calico
-from calico.ipam import IPPoolManager
-import linkerd
-from linkerd_api import ServiceProfile
-import kong
-from kong.roboclient import KongAdminClient
-import etcd3
-from etcd3 import client as etcd_client
-from kazoo.client import KazooClient
-
-# API and Web Frameworks
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-import grpc
-from grpc import aio
-import protobuf
-from graphql import graphql_sync, build_schema
-import asyncapi
-from asyncapi import AsyncAPI
-import openapi_spec_validator
-from openapi_spec_validator import validate_spec
-import json_schema_validator
-from jsonschema import validate
-import avro
-from avro.schema import Parse
-
-# CI/CD and DevOps
-import jenkins
-from jenkins import Jenkins
-import gitlab
-from gitlab.v4.objects import Project
-import github
-from github import Github, GithubIntegration
-import argo_cd_client
-from argo_cd_client.api import application_service_api
-import tekton_pipeline
-from tekton_pipeline import v1beta1
-import argo_workflows
-from argo_workflows.api import workflow_service_api
-from airflow.models import DAG
-from airflow.operators.python import PythonOperator
-import prefect
-from prefect import Flow, task
-from dask.distributed import Client
-import flagger
-from flagger import canary
-import spinnaker
-from spinnaker import application
-
-# Testing and Quality Assurance
-import pytest
-import unittest
-from hypothesis import given, strategies as st
-import behave
-from behave.runner import Context
-import robot
-from robot import run
-import selenium
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-import locust
-from locust import HttpUser, task, between
-import jmeter
-from jmeter_api import ScenarioBuilder
-import k6
-from k6 import http
-import allure
-from allure_commons.types import AttachmentType
-import coverage
-from coverage import Coverage
-import sonarqube
-from sonarqube import SonarQubeClient
-
-# Monitoring and Observability
-import prometheus_client
-from prometheus_client import Counter, Gauge, Histogram, Summary
-from opentelemetry import trace, metrics
-from opentelemetry.exporter import jaeger, zipkin, otlp
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-import grafana_api
-from grafana_api.grafana_face import GrafanaFace
-import datadog
-from datadog import initialize as dd_initialize, statsd
-from newrelic.agent import NewRelicContextFormatter
-import sentry_sdk
-from sentry_sdk.integrations.logging import LoggingIntegration
-import loki
-from grafana_loki_client import LokiClient
-import fluentd
-from fluent import sender, event
-
-# Machine Learning Operations
-import mlflow
-from mlflow.tracking import MlflowClient
-import bentoml
-from bentoml import Service, api
-import seldon_core
-from seldon_core.seldon_client import SeldonClient
-import kubeflow
-from kubeflow import client
-
-# Security and Authentication
-import jwt
-from jwt.algorithms import RSAAlgorithm
-import passlib
-from passlib.hash import argon2, pbkdf2_sha512
-import cryptography
-from cryptography import x509
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ed25519, padding as asymmetric_padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
-from cryptography.x509.oid import NameOID
-import pyopenssl
-import pyhsm
-from asn1crypto import cms, core, keys
-from oscrypto import asymmetric
-import oauthlib
-from oauthlib.oauth2 import RequestValidator
-import pysaml2
-from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
-import webauthn
-from webauthn import WebAuthnCredential
-import yubikey
-from yubikey_manager import authenticate
-
-# Quantum Computing
-import qiskit
-from qiskit import QuantumCircuit, execute, Aer
-import cirq
-from cirq import Circuit, Simulator
-import pennylane as qml
-from pennylane import numpy as np
-import tensorflow_quantum as tfq
-
-# Blockchain
-import web3
-from web3 import Web3, HTTPProvider
-from web3.middleware import geth_poa_middleware
-import solcx
-from solcx import compile_source
-import eth_account
-from eth_account import Account
-import eth_keys
-from eth_keys import keys
-
-# Compliance and Regulations
-import gdpr
-from gdpr_framework import GDPRCompliance
-import hipaa
-from hipaa_framework import HIPAACompliance
-
-# Additional Utilities
-import jinja2
-from jinja2 import Environment, FileSystemLoader
-import yaml
-import streamlit as st
-import plotly.express as px
-
-EOL
-
-# Set execute permission for Python script
+# Set execute permission
 chmod +x $INSTALL_DIR/scripts/ikev2_script.py
 
-# Install prerequisites
-apt-get update
-apt-get install -y python3 python3-pip python3-venv nginx nodejs npm
-
 # Create and activate virtual environment
+echo -e "${GREEN}Setting up Python virtual environment...${NC}"
 python3 -m venv $INSTALL_DIR/venv
 source $INSTALL_DIR/venv/bin/activate
 
 # Install Python requirements
+echo -e "${GREEN}Installing Python requirements...${NC}"
+pip install --upgrade pip setuptools wheel
 pip install -r $INSTALL_DIR/scripts/requirements.txt
 
-# Create main FastAPI file
-cat > $INSTALL_DIR/scripts/api.py << 'EOL'
+# Create API file
+echo -e "${GREEN}Creating API server...${NC}"
+cat > $INSTALL_DIR/scripts/api.py << 'EOF'
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import subprocess
@@ -9202,7 +8892,6 @@ from typing import Dict, Any
 
 app = FastAPI()
 
-# CORS settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -9211,12 +8900,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Main script path
 SCRIPT_PATH = "/opt/ikev2-manager/scripts/ikev2_script.py"
 
 @app.get("/api/status")
 async def get_status():
-    """Get server status"""
     try:
         result = subprocess.run([SCRIPT_PATH, "status"], 
                               capture_output=True, 
@@ -9229,7 +8916,6 @@ async def get_status():
 
 @app.get("/api/users")
 async def get_users():
-    """Get list of users"""
     try:
         result = subprocess.run([SCRIPT_PATH, "list-users"], 
                               capture_output=True, 
@@ -9242,7 +8928,6 @@ async def get_users():
 
 @app.post("/api/users")
 async def create_user(user_data: Dict[str, Any]):
-    """Create new user"""
     try:
         cmd = [SCRIPT_PATH, "add-user", 
                "--username", user_data["username"],
@@ -9256,20 +8941,19 @@ async def create_user(user_data: Dict[str, Any]):
 
 @app.delete("/api/users/{username}")
 async def delete_user(username: str):
-    """Delete user"""
     try:
         result = subprocess.run([SCRIPT_PATH, "delete-user", "--username", username], 
-                              capture_output=True, 
-                              text=True)
+                              capture_output=True, text=True)
         if result.returncode == 0:
             return {"status": "success", "message": "User deleted successfully"}
         raise HTTPException(status_code=500, detail=result.stderr)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-EOL
+EOF
 
-# Create systemd service for API
-cat > /etc/systemd/system/ikev2-api.service << 'EOL'
+# Create systemd service
+echo -e "${GREEN}Creating systemd service...${NC}"
+cat > /etc/systemd/system/ikev2-api.service << 'EOF'
 [Unit]
 Description=IKEv2 Manager API
 After=network.target
@@ -9283,16 +8967,17 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOL
+EOF
 
 # Configure Nginx
-cat > /etc/nginx/sites-available/ikev2-manager << 'EOL'
+echo -e "${GREEN}Configuring Nginx...${NC}"
+cat > /etc/nginx/sites-available/ikev2-manager << 'EOF'
 server {
     listen 80;
     server_name _;
 
     location / {
-        root /opt/ikev2-manager/web;
+        root /opt/ikev2-manager/web/build;
         index index.html;
         try_files $uri $uri/ /index.html;
     }
@@ -9306,19 +8991,57 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
-EOL
+EOF
+
+# Setup frontend
+echo -e "${GREEN}Setting up frontend...${NC}"
+mkdir -p $INSTALL_DIR/web/{public,src}
+
+# Create a basic package.json
+cat > $INSTALL_DIR/web/package.json << 'EOF'
+{
+  "name": "ikev2-manager",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.0.0",
+    "@emotion/react": "^11.0.0",
+    "@emotion/styled": "^11.0.0",
+    "axios": "^1.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  }
+}
+EOF
+
+# Create index.html
+cat > $INSTALL_DIR/web/public/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IKEv2 Manager</title>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
+EOF
+
+cd $INSTALL_DIR/web
+npm install
 
 # Enable Nginx config
 ln -sf /etc/nginx/sites-available/ikev2-manager /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
-# Install and build React frontend
-cd $INSTALL_DIR/web
-npx create-react-app .
-npm install @mui/material @emotion/react @emotion/styled axios
-npm run build
-
 # Start services
+echo -e "${GREEN}Starting services...${NC}"
 systemctl daemon-reload
 systemctl enable nginx ikev2-api
 systemctl restart nginx
@@ -9328,7 +9051,6 @@ echo -e "${GREEN}Installation completed successfully!${NC}"
 echo -e "${YELLOW}Website is accessible at http://SERVER_IP${NC}"
 echo -e "${YELLOW}API is accessible at http://SERVER_IP/api${NC}"
 
-# Display important information
 echo -e "${YELLOW}Important paths:${NC}"
 echo "- Main script: $INSTALL_DIR/scripts/ikev2_script.py"
 echo "- API: $INSTALL_DIR/scripts/api.py"
