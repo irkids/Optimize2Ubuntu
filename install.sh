@@ -4,6 +4,7 @@
 PANEL_DIR="/opt/irssh-panel"
 SCRIPT_URL="https://raw.githubusercontent.com/irkids/Optimize2Ubuntu/refs/heads/main/ikev2-script.py"
 LOG_FILE="/root/install.log"
+NODE_VERSION="20.10.0"  # Specify exact Node.js version
 
 # Colors
 GREEN='\033[0;32m'
@@ -25,6 +26,17 @@ if [[ $EUID -ne 0 ]]; then
     error "This script must be run as root"
 fi
 
+# Install Node.js
+install_nodejs() {
+    log "Installing Node.js $NODE_VERSION..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - || error "Failed to setup Node.js repository"
+    apt-get install -y nodejs || error "Failed to install Node.js"
+    
+    # Install yarn
+    log "Installing Yarn..."
+    npm install -g yarn || error "Failed to install Yarn"
+}
+
 # Clean previous installation
 log "Cleaning previous installation..."
 if [ -d "$PANEL_DIR" ]; then
@@ -32,6 +44,9 @@ if [ -d "$PANEL_DIR" ]; then
     systemctl disable irssh-panel >/dev/null 2>&1
     rm -rf "$PANEL_DIR"
 fi
+
+# Install Node.js
+install_nodejs
 
 # Create fresh directory
 log "Creating installation directory..."
@@ -44,28 +59,26 @@ curl -o scripts/ikev2.py "$SCRIPT_URL" || error "Failed to download IKEv2 script
 chmod +x scripts/ikev2.py
 sed -i 's/\r$//' scripts/ikev2.py
 
-# Create temporary React project
-log "Creating temporary React project..."
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR" || error "Failed to change to temp directory"
-npx create-react-app irssh-panel --template typescript || error "Failed to create React project"
+# Create React project using Yarn
+log "Creating React project..."
+yarn create react-app irssh-panel --template typescript || error "Failed to create React project"
 
 # Move React project files
 log "Setting up React project..."
 mv irssh-panel/* irssh-panel/.* "$PANEL_DIR" 2>/dev/null || true
 cd "$PANEL_DIR" || error "Failed to change directory"
 
-# Install dependencies
+# Install dependencies with specific versions
 log "Installing dependencies..."
-npm install \
-    @headlessui/react \
-    @heroicons/react \
-    tailwindcss \
-    postcss \
-    autoprefixer \
-    recharts \
-    axios \
-    react-router-dom || error "Failed to install dependencies"
+yarn add \
+    @headlessui/react@1.7.17 \
+    @heroicons/react@2.1.1 \
+    tailwindcss@3.4.1 \
+    postcss@8.4.33 \
+    autoprefixer@10.4.16 \
+    recharts@2.10.3 \
+    axios@1.6.5 \
+    react-router-dom@6.21.1 || error "Failed to install dependencies"
 
 # Initialize Tailwind
 log "Setting up Tailwind CSS..."
@@ -93,37 +106,42 @@ mkdir -p src/{components/{layout,dashboard,users},utils,pages}
 # Create IKEv2 utility
 log "Setting up IKEv2 integration..."
 cat > src/utils/ikev2.ts << 'EOL'
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
-const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2.py';
+import axios from 'axios';
 
 export class IKEv2Manager {
-    async addUser(username: string, password: string) {
+    private baseUrl: string;
+
+    constructor() {
+        this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    }
+
+    async addUser(username: string, password: string): Promise<boolean> {
         try {
-            await execAsync(`sudo python3 ${SCRIPT_PATH} add-user ${username} ${password}`);
-            return true;
+            const response = await axios.post(`${this.baseUrl}/api/ikev2/users`, { 
+                username, 
+                password 
+            });
+            return response.status === 200;
         } catch (error) {
             console.error('Failed to add user:', error);
             return false;
         }
     }
 
-    async deleteUser(username: string) {
+    async deleteUser(username: string): Promise<boolean> {
         try {
-            await execAsync(`sudo python3 ${SCRIPT_PATH} remove-user ${username}`);
-            return true;
+            const response = await axios.delete(`${this.baseUrl}/api/ikev2/users/${username}`);
+            return response.status === 200;
         } catch (error) {
             console.error('Failed to delete user:', error);
             return false;
         }
     }
 
-    async listUsers() {
+    async listUsers(): Promise<string[]> {
         try {
-            const { stdout } = await execAsync(`sudo python3 ${SCRIPT_PATH} list-users`);
-            return stdout.trim().split('\n');
+            const response = await axios.get(`${this.baseUrl}/api/ikev2/users`);
+            return response.data;
         } catch (error) {
             console.error('Failed to list users:', error);
             return [];
@@ -157,8 +175,9 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$PANEL_DIR
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/bin/yarn start
 Restart=always
+Environment=PORT=3000
 
 [Install]
 WantedBy=multi-user.target
@@ -172,7 +191,7 @@ systemctl start irssh-panel
 
 # Clean up
 log "Cleaning up..."
-rm -rf "$TEMP_DIR"
+rm -rf "$PANEL_DIR/irssh-panel"
 
 # Success message
 log "Installation completed successfully!"
