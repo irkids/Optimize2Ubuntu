@@ -48,13 +48,7 @@ fi
 # Install Node.js
 install_nodejs
 
-# Create temporary directory for React project
-TEMP_DIR=$(mktemp -d)
-log "Creating temporary React project..."
-cd "$TEMP_DIR" || error "Failed to change to temp directory"
-yarn create react-app irssh-panel --template typescript || error "Failed to create React project"
-
-# Create panel directory
+# Create fresh directory
 log "Creating installation directory..."
 mkdir -p "$PANEL_DIR/scripts"
 
@@ -64,13 +58,16 @@ curl -o "$PANEL_DIR/scripts/ikev2.py" "$SCRIPT_URL" || error "Failed to download
 chmod +x "$PANEL_DIR/scripts/ikev2.py"
 sed -i 's/\r$//' "$PANEL_DIR/scripts/ikev2.py"
 
-# Move React project files
-log "Moving React project files..."
-mv "$TEMP_DIR/irssh-panel/"* "$TEMP_DIR/irssh-panel/".* "$PANEL_DIR/" 2>/dev/null || true
-cd "$PANEL_DIR" || error "Failed to change directory"
-rm -rf "$TEMP_DIR"
+# Create temporary directory for React project
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR" || error "Failed to change to temp directory"
+
+# Create React project
+log "Creating React project..."
+yarn create react-app irssh-panel --template typescript || error "Failed to create React project"
 
 # Install dependencies
+cd irssh-panel || error "Failed to change directory"
 log "Installing dependencies..."
 yarn add \
     @headlessui/react@1.7.17 \
@@ -84,22 +81,38 @@ yarn add \
 
 # Initialize Tailwind
 log "Setting up Tailwind CSS..."
-cat > tailwind.config.js << 'EOF'
+cat > tailwind.config.js << TAILWINDEOF
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   theme: { extend: {} },
   plugins: [],
 }
-EOL
+TAILWINDEOF
 
-cat > postcss.config.js << 'EOL'
+cat > postcss.config.js << POSTCSSEOF
 module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
   },
 }
-EOL
+POSTCSSEOF
+
+# Update index.css
+cat > src/index.css << CSSEOF
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+CSSEOF
 
 # Setup project structure
 log "Creating project structure..."
@@ -107,7 +120,7 @@ mkdir -p src/{components/{layout,dashboard,users},utils,pages}
 
 # Create IKEv2 utility
 log "Setting up IKEv2 integration..."
-cat > src/utils/ikev2.ts << 'EOL'
+cat > src/utils/ikev2.ts << TSEOF
 import axios from 'axios';
 
 export class IKEv2Manager {
@@ -119,7 +132,7 @@ export class IKEv2Manager {
 
     async addUser(username: string, password: string): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.baseUrl}/api/ikev2/users`, { 
+            const response = await axios.post(\`\${this.baseUrl}/api/ikev2/users\`, { 
                 username, 
                 password 
             });
@@ -132,7 +145,7 @@ export class IKEv2Manager {
 
     async deleteUser(username: string): Promise<boolean> {
         try {
-            const response = await axios.delete(`${this.baseUrl}/api/ikev2/users/${username}`);
+            const response = await axios.delete(\`\${this.baseUrl}/api/ikev2/users/\${username}\`);
             return response.status === 200;
         } catch (error) {
             console.error('Failed to delete user:', error);
@@ -142,7 +155,7 @@ export class IKEv2Manager {
 
     async listUsers(): Promise<string[]> {
         try {
-            const response = await axios.get(`${this.baseUrl}/api/ikev2/users`);
+            const response = await axios.get(\`\${this.baseUrl}/api/ikev2/users\`);
             return response.data;
         } catch (error) {
             console.error('Failed to list users:', error);
@@ -152,11 +165,11 @@ export class IKEv2Manager {
 }
 
 export default new IKEv2Manager();
-EOL
+TSEOF
 
 # Create IKEv2Users component
 log "Creating IKEv2Users component..."
-cat > src/components/users/IKEv2Users.tsx << 'EOL'
+cat > src/components/users/IKEv2Users.tsx << REACTEOF
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import IKEv2Manager from '../../utils/ikev2';
@@ -287,11 +300,11 @@ const IKEv2Users: React.FC = () => {
 };
 
 export default IKEv2Users;
-EOL
+REACTEOF
 
 # Create Layout component
 log "Creating Layout component..."
-cat > src/components/layout/MainLayout.tsx << 'EOL'
+cat > src/components/layout/MainLayout.tsx << LAYOUTEOF
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { HomeIcon, UserGroupIcon } from '@heroicons/react/24/outline';
@@ -307,7 +320,6 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="flex">
-        {/* Sidebar */}
         <div className="w-64 bg-white h-screen shadow-lg">
           <div className="px-6 py-4 border-b">
             <h1 className="text-xl font-bold">IRSSH Panel</h1>
@@ -319,11 +331,11 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-6 py-3 text-sm font-medium ${
+                  className={\`flex items-center px-6 py-3 text-sm font-medium \${
                     isActive
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-                  }`}
+                  }\`}
                 >
                   <item.icon className="h-5 w-5 mr-3" />
                   {item.name}
@@ -333,7 +345,6 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </nav>
         </div>
 
-        {/* Main content */}
         <div className="flex-1">
           <main className="p-6">{children}</main>
         </div>
@@ -343,11 +354,11 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default MainLayout;
-EOL
+LAYOUTEOF
 
 # Create Dashboard component
 log "Creating Dashboard component..."
-cat > src/components/dashboard/Dashboard.tsx << 'EOL'
+cat > src/components/dashboard/Dashboard.tsx << DASHEOF
 import React from 'react';
 import { ArrowTrendingUpIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 
@@ -357,7 +368,6 @@ const Dashboard: React.FC = () => {
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Active Users Card */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <UserGroupIcon className="h-8 w-8 text-blue-500" />
@@ -368,7 +378,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Network Traffic Card */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <ArrowTrendingUpIcon className="h-8 w-8 text-green-500" />
@@ -384,11 +393,11 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-EOL
+DASHEOF
 
-# Update App.tsx with routing
+# Update App.tsx
 log "Setting up routing..."
-cat > src/App.tsx << 'EOL'
+cat > src/App.tsx << APPEOF
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
@@ -410,42 +419,42 @@ function App() {
 }
 
 export default App;
-EOL
-
-# Update index.css with Tailwind
-log "Setting up Tailwind CSS..."
-cat > src/index.css << 'EOL'
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  margin: 0;
-  font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-EOL
+APPEOF
 
 # Setup environment
 log "Configuring environment..."
-cat > .env << EOL
+cat > .env << ENVEOF
 REACT_APP_API_URL=http://localhost:3000
-REACT_APP_IKEV2_SCRIPT_PATH=/opt/irssh-panel/scripts/ikev2.py
-EOL
+ENVEOF
+
+# Move all files to panel directory
+log "Moving files to panel directory..."
+cd ..
+cp -r irssh-panel/* irssh-panel/.* "$PANEL_DIR/" 2>/dev/null || true
+cd "$PANEL_DIR" || error "Failed to change directory"
+rm -rf "$TEMP_DIR"
 
 # Set permissions
 log "Setting permissions..."
 chown -R root:root "$PANEL_DIR"
 chmod -R 755 "$PANEL_DIR"
 
-# Create REST API server for IKEv2
-log "Setting up API server..."
-cat > server.js << \EOF
+# Set up sudo access for API server
+log "Setting up sudo access..."
+echo "irssh ALL=(ALL) NOPASSWD: /opt/irssh-panel/scripts/ikev2.py" > /etc/sudoers.d/irssh-panel
+chmod 0440 /etc/sudoers.d/irssh-panel
 
+# Create API user
+log "Creating API user..."
+useradd -r -s /bin/false irssh
+chown -R irssh:irssh "$PANEL_DIR"
+chmod 755 "$PANEL_DIR/scripts/ikev2.py"
+
+# Set up API server
+log "Setting up API server..."
+cat > "$PANEL_DIR/server.js" << SERVEREOF
 #!/usr/bin/env node
+
 const express = require('express');
 const cors = require('cors');
 const { exec } = require('child_process');
@@ -462,23 +471,21 @@ app.use(express.json());
 
 const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2.py';
 
-// Middleware for error handling
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Internal server error' });
 });
 
-// Middleware for logging
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    console.log(\`\${new Date().toISOString()} \${req.method} \${req.url}\`);
     next();
 });
 
 app.get('/api/ikev2/users', async (req, res) => {
     try {
         console.log('Executing list-users command...');
-        const { stdout } = await execAsync(`sudo ${SCRIPT_PATH} list-users`);
-        const users = stdout.trim().split('\n').filter(Boolean);
+        const { stdout } = await execAsync(\`sudo \${SCRIPT_PATH} list-users\`);
+        const users = stdout.trim().split('\\n').filter(Boolean);
         console.log('Users found:', users);
         res.json(users);
     } catch (error) {
@@ -494,9 +501,9 @@ app.post('/api/ikev2/users', async (req, res) => {
     }
 
     try {
-        console.log(`Adding user: ${username}`);
-        await execAsync(`sudo ${SCRIPT_PATH} add-user ${username} ${password}`);
-        console.log(`Successfully added user: ${username}`);
+        console.log(\`Adding user: \${username}\`);
+        await execAsync(\`sudo \${SCRIPT_PATH} add-user \${username} \${password}\`);
+        console.log(\`Successfully added user: \${username}\`);
         res.json({ success: true });
     } catch (error) {
         console.error('Error adding user:', error);
@@ -507,9 +514,9 @@ app.post('/api/ikev2/users', async (req, res) => {
 app.delete('/api/ikev2/users/:username', async (req, res) => {
     const { username } = req.params;
     try {
-        console.log(`Removing user: ${username}`);
-        await execAsync(`sudo ${SCRIPT_PATH} remove-user ${username}`);
-        console.log(`Successfully removed user: ${username}`);
+        console.log(\`Removing user: \${username}\`);
+        await execAsync(\`sudo \${SCRIPT_PATH} remove-user \${username}\`);
+        console.log(\`Successfully removed user: \${username}\`);
         res.json({ success: true });
     } catch (error) {
         console.error('Error removing user:', error);
@@ -519,89 +526,26 @@ app.delete('/api/ikev2/users/:username', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(\`Server running on http://localhost:\${PORT}\`);
 });
-EOL
-const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
+SERVEREOF
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2.py';
-
-app.get('/api/ikev2/users', async (req, res) => {
-  try {
-    const { stdout } = await execAsync(`sudo python3 ${SCRIPT_PATH} list-users`);
-    const users = stdout.trim().split('\n').filter(Boolean);
-    res.json(users);
-  } catch (error) {
-    console.error('Error listing users:', error);
-    res.status(500).json({ error: 'Failed to list users' });
-  }
-});
-
-app.post('/api/ikev2/users', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-
-  try {
-    await execAsync(`sudo python3 ${SCRIPT_PATH} add-user ${username} ${password}`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error adding user:', error);
-    res.status(500).json({ error: 'Failed to add user' });
-  }
-});
-
-app.delete('/api/ikev2/users/:username', async (req, res) => {
-  const { username } = req.params;
-  try {
-    await execAsync(`sudo python3 ${SCRIPT_PATH} remove-user ${username}`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error removing user:', error);
-    res.status(500).json({ error: 'Failed to remove user' });
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-EOL
+chmod +x "$PANEL_DIR/server.js"
 
 # Install API server dependencies
 log "Installing API server dependencies..."
 yarn add express cors
 
-# Set up sudo access for API server
-log "Setting up sudo access..."
-echo "irssh ALL=(ALL) NOPASSWD: /opt/irssh-panel/scripts/ikev2.py" > /etc/sudoers.d/irssh-panel
-chmod 0440 /etc/sudoers.d/irssh-panel
-
-# Create API user
-log "Creating API user..."
-useradd -r -s /bin/false irssh
-chown -R irssh:irssh "$PANEL_DIR"
-chmod 755 "$PANEL_DIR/scripts/ikev2.py"
-
-# Create service for API server
-log "Creating API server service..."
-cat > /etc/systemd/system/irssh-api.service << EOL
+# Create systemd services
+log "Creating systemd services..."
+cat > /etc/systemd/system/irssh-api.service << APISEREOF
 [Unit]
 Description=IRSSH API Server
 After=network.target
 
 [Service]
 Type=simple
-User=root
+User=irssh
 WorkingDirectory=$PANEL_DIR
 ExecStart=/usr/bin/node server.js
 Restart=always
@@ -609,11 +553,9 @@ Environment=PORT=3000
 
 [Install]
 WantedBy=multi-user.target
-EOL
+APISEREOF
 
-# Create service for React app
-log "Creating React app service..."
-cat > /etc/systemd/system/irssh-panel.service << EOL
+cat > /etc/systemd/system/irssh-panel.service << PANELSEREOF
 [Unit]
 Description=IRSSH Panel
 After=network.target
@@ -628,10 +570,7 @@ Environment=PORT=3001
 
 [Install]
 WantedBy=multi-user.target
-EOL
-
-# Update React app port in environment
-sed -i 's/REACT_APP_API_URL=http:\/\/localhost:3000/REACT_APP_API_URL=http:\/\/localhost:3000/g' .env
+PANELSEREOF
 
 # Start services
 log "Starting services..."
@@ -640,10 +579,6 @@ systemctl enable irssh-api
 systemctl enable irssh-panel
 systemctl start irssh-api
 systemctl start irssh-panel
-
-# Clean up
-log "Cleaning up..."
-rm -rf "$PANEL_DIR/irssh-panel"
 
 # Success message
 log "Installation completed successfully!"
