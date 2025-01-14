@@ -42,16 +42,8 @@ log "Cleaning previous installation..."
 if [ -d "$PANEL_DIR" ]; then
     systemctl stop irssh-panel >/dev/null 2>&1
     systemctl disable irssh-panel >/dev/null 2>&1
-    rm -rf "$PANEL_DIR"/*  # Remove all directory contents
+    rm -rf "$PANEL_DIR"
 fi
-
-# Create React project directly in panel directory
-log "Creating React project..."
-cd "$PANEL_DIR" || error "Failed to change to panel directory"
-yarn create react-app . --template typescript || error "Failed to create React project"
-
-# Then create scripts directory and download IKEv2 script
-mkdir -p "$PANEL_DIR/scripts"
 
 # Install Node.js
 install_nodejs
@@ -452,6 +444,83 @@ chmod -R 755 "$PANEL_DIR"
 # Create REST API server for IKEv2
 log "Setting up API server..."
 cat > server.js << 'EOL'
+#!/usr/bin/env node
+const express = require('express');
+const cors = require('cors');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
+
+const app = express();
+app.use(cors({
+    origin: 'http://localhost:3001',
+    methods: ['GET', 'POST', 'DELETE'],
+    credentials: true
+}));
+app.use(express.json());
+
+const SCRIPT_PATH = '/opt/irssh-panel/scripts/ikev2.py';
+
+// Middleware for error handling
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// Middleware for logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+});
+
+app.get('/api/ikev2/users', async (req, res) => {
+    try {
+        console.log('Executing list-users command...');
+        const { stdout } = await execAsync(`sudo ${SCRIPT_PATH} list-users`);
+        const users = stdout.trim().split('\n').filter(Boolean);
+        console.log('Users found:', users);
+        res.json(users);
+    } catch (error) {
+        console.error('Error listing users:', error);
+        res.status(500).json({ error: 'Failed to list users', details: error.message });
+    }
+});
+
+app.post('/api/ikev2/users', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    try {
+        console.log(`Adding user: ${username}`);
+        await execAsync(`sudo ${SCRIPT_PATH} add-user ${username} ${password}`);
+        console.log(`Successfully added user: ${username}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error adding user:', error);
+        res.status(500).json({ error: 'Failed to add user', details: error.message });
+    }
+});
+
+app.delete('/api/ikev2/users/:username', async (req, res) => {
+    const { username } = req.params;
+    try {
+        console.log(`Removing user: ${username}`);
+        await execAsync(`sudo ${SCRIPT_PATH} remove-user ${username}`);
+        console.log(`Successfully removed user: ${username}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error removing user:', error);
+        res.status(500).json({ error: 'Failed to remove user', details: error.message });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+EOL
 const express = require('express');
 const cors = require('cors');
 const { exec } = require('child_process');
@@ -510,6 +579,17 @@ EOL
 # Install API server dependencies
 log "Installing API server dependencies..."
 yarn add express cors
+
+# Set up sudo access for API server
+log "Setting up sudo access..."
+echo "irssh ALL=(ALL) NOPASSWD: /opt/irssh-panel/scripts/ikev2.py" > /etc/sudoers.d/irssh-panel
+chmod 0440 /etc/sudoers.d/irssh-panel
+
+# Create API user
+log "Creating API user..."
+useradd -r -s /bin/false irssh
+chown -R irssh:irssh "$PANEL_DIR"
+chmod 755 "$PANEL_DIR/scripts/ikev2.py"
 
 # Create service for API server
 log "Creating API server service..."
