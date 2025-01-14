@@ -11,7 +11,6 @@ from logging import getLogger, basicConfig, INFO
 basicConfig(level=INFO)
 logger = getLogger("IKEv2 Installer")
 
-# Ensure the script is run as root
 def check_root():
     """Check if the script is running as root."""
     if os.geteuid() != 0:
@@ -20,53 +19,114 @@ def check_root():
 
 check_root()
 
-# Dependency and virtual environment management
-class DependencyManager:
-    def __init__(self, venv_path="/opt/my_module_venv"):
-        self.venv_path = Path(venv_path)
-        self.venv_python = self.venv_path / "bin" / "python"
-        self.venv_pip = self.venv_path / "bin" / "pip"
-        self.required_packages = [
-            "redis>=5.2.0",
-            "asyncpg>=0.30.0",
-            "sqlalchemy>=2.0.0",
-            "fastapi>=0.95.0",
-            "uvicorn>=0.34.0",
-            "ansible",
-            "cryptography",
-            "bcrypt",
-            "pydantic>=2.0.0",
-            "passlib",
-            "psutil",
-            "docker",
-            "prometheus_client",
-        ]
+def run_command(cmd):
+    """Run a shell command and return output."""
+    try:
+        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {e.cmd}\nError: {e.stderr}")
+        return None
 
-    def setup_virtualenv(self):
-        """Set up a Python virtual environment and install dependencies."""
+class IPSecManager:
+    def __init__(self):
+        self.ipsec_dir = "/etc/ipsec.d"
+        self.secrets_file = "/etc/ipsec.secrets"
+        
+    def add_user(self, username, password):
+        """Add a new IKEv2 user."""
         try:
-            # Create virtual environment if it doesn't exist
-            if not self.venv_path.exists():
-                logger.info(f"Creating virtual environment at {self.venv_path}...")
-                subprocess.check_call([sys.executable, "-m", "venv", str(self.venv_path)])
+            run_command(f"ipsec pki --gen --outform pem > {self.ipsec_dir}/{username}_key.pem")
+            run_command(f"ipsec pki --pub --in {self.ipsec_dir}/{username}_key.pem | "
+                       f"ipsec pki --issue --cacert {self.ipsec_dir}/cacerts/ca.crt "
+                       f"--cakey {self.ipsec_dir}/private/ca.key "
+                       f'--dn "C=IR, O=IRSSH, CN={username}" '
+                       f"--outform pem > {self.ipsec_dir}/certs/{username}.crt")
+            
+            with open(self.secrets_file, 'a') as f:
+                f.write(f'{username} : EAP "{password}"\n')
+            
+            run_command("ipsec reload")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to add user {username}: {str(e)}")
+            return False
+    
+    def remove_user(self, username):
+        """Remove an IKEv2 user."""
+        try:
+            key_file = f"{self.ipsec_dir}/{username}_key.pem"
+            cert_file = f"{self.ipsec_dir}/certs/{username}.crt"
+            if os.path.exists(key_file):
+                os.remove(key_file)
+            if os.path.exists(cert_file):
+                os.remove(cert_file)
+            
+            with open(self.secrets_file, 'r') as f:
+                lines = f.readlines()
+            with open(self.secrets_file, 'w') as f:
+                for line in lines:
+                    if not line.startswith(f'{username} : EAP'):
+                        f.write(line)
+            
+            run_command("ipsec reload")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to remove user {username}: {str(e)}")
+            return False
+    
+    def list_users(self):
+        """List all IKEv2 users."""
+        try:
+            users = []
+            with open(self.secrets_file, 'r') as f:
+                for line in f:
+                    if ' : EAP "' in line:
+                        username = line.split(':')[0].strip()
+                        users.append(username)
+            return users
+        except Exception as e:
+            logger.error(f"Failed to list users: {str(e)}")
+            return []
 
-            # Upgrade pip and setuptools
-            logger.info("Upgrading pip and setuptools...")
-            subprocess.check_call([str(self.venv_pip), "install", "--upgrade", "pip", "setuptools", "wheel"])
-
-            # Install required packages
-            logger.info("Installing required Python packages...")
-            subprocess.check_call([str(self.venv_pip), "install"] + self.required_packages)
-
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error during virtual environment setup: {e}")
+def main():
+    manager = IPSecManager()
+    
+    if len(sys.argv) < 2:
+        print("Usage:")
+        print("  Add user:    ikev2.py add-user <username> <password>")
+        print("  Remove user: ikev2.py remove-user <username>")
+        print("  List users:  ikev2.py list-users")
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    
+    if command == "add-user" and len(sys.argv) == 4:
+        username, password = sys.argv[2], sys.argv[3]
+        if manager.add_user(username, password):
+            print(f"User {username} added successfully")
+        else:
             sys.exit(1)
+            
+    elif command == "remove-user" and len(sys.argv) == 3:
+        username = sys.argv[2]
+        if manager.remove_user(username):
+            print(f"User {username} removed successfully")
+        else:
+            sys.exit(1)
+            
+    elif command == "list-users":
+        users = manager.list_users()
+        print("\n".join(users))
+        
+    else:
+        print("Invalid command")
+        sys.exit(1)
 
-        logger.info(f"Virtual environment setup complete. Use {self.venv_python} to run your script.")
-
-# Initialize and set up the virtual environment
-dependency_manager = DependencyManager()
-dependency_manager.setup_virtualenv()
+if __name__ == "__main__":
+    main()
 
 # Standard library imports
 import asyncio
