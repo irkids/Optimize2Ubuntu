@@ -1,8 +1,4 @@
-# Backup the original script
-sudo mv /opt/irssh-panel/scripts/ikev2.py /opt/irssh-panel/scripts/ikev2.py.bak
-
-# Create the new script
-sudo bash -c 'cat > /opt/irssh-panel/scripts/ikev2.py' << EOL
+sudo bash -c 'cat > /opt/irssh-panel/scripts/ikev2.py' << 'EOL'
 #!/usr/bin/env python3
 
 import os
@@ -129,7 +125,6 @@ if __name__ == "__main__":
 EOL
 
 sudo chmod +x /opt/irssh-panel/scripts/ikev2.py
-sudo chown irssh:irssh /opt/irssh-panel/scripts/ikev2.py
 
 # Standard library imports
 import asyncio
