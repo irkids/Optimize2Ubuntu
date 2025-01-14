@@ -1,4 +1,3 @@
-sudo bash -c 'cat > /opt/irssh-panel/scripts/ikev2.py' << 'EOL'
 #!/usr/bin/env python3
 
 import os
@@ -122,9 +121,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-EOL
-
-sudo chmod +x /opt/irssh-panel/scripts/ikev2.py
 
 # Standard library imports
 import asyncio
