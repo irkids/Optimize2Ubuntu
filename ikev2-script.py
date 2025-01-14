@@ -1,3 +1,8 @@
+# Backup the original script
+sudo mv /opt/irssh-panel/scripts/ikev2.py /opt/irssh-panel/scripts/ikev2.py.bak
+
+# Create the new script
+sudo bash -c 'cat > /opt/irssh-panel/scripts/ikev2.py' << EOL
 #!/usr/bin/env python3
 
 import os
@@ -7,12 +12,10 @@ import shutil
 from pathlib import Path
 from logging import getLogger, basicConfig, INFO
 
-# Set up logging
 basicConfig(level=INFO)
 logger = getLogger("IKEv2 Installer")
 
 def check_root():
-    """Check if the script is running as root."""
     if os.geteuid() != 0:
         logger.error("This script must be run as root!")
         sys.exit(1)
@@ -20,7 +23,6 @@ def check_root():
 check_root()
 
 def run_command(cmd):
-    """Run a shell command and return output."""
     try:
         result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
         return result.stdout.strip()
@@ -34,7 +36,6 @@ class IPSecManager:
         self.secrets_file = "/etc/ipsec.secrets"
         
     def add_user(self, username, password):
-        """Add a new IKEv2 user."""
         try:
             run_command(f"ipsec pki --gen --outform pem > {self.ipsec_dir}/{username}_key.pem")
             run_command(f"ipsec pki --pub --in {self.ipsec_dir}/{username}_key.pem | "
@@ -54,7 +55,6 @@ class IPSecManager:
             return False
     
     def remove_user(self, username):
-        """Remove an IKEv2 user."""
         try:
             key_file = f"{self.ipsec_dir}/{username}_key.pem"
             cert_file = f"{self.ipsec_dir}/certs/{username}.crt"
@@ -78,7 +78,6 @@ class IPSecManager:
             return False
     
     def list_users(self):
-        """List all IKEv2 users."""
         try:
             users = []
             with open(self.secrets_file, 'r') as f:
@@ -127,6 +126,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+EOL
+
+sudo chmod +x /opt/irssh-panel/scripts/ikev2.py
+sudo chown irssh:irssh /opt/irssh-panel/scripts/ikev2.py
 
 # Standard library imports
 import asyncio
