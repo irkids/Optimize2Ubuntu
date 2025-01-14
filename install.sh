@@ -84,7 +84,7 @@ yarn add \
 
 # Initialize Tailwind
 log "Setting up Tailwind CSS..."
-cat > tailwind.config.js << 'EOL'
+cat > tailwind.config.js << 'EOF'
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   theme: { extend: {} },
@@ -443,7 +443,8 @@ chmod -R 755 "$PANEL_DIR"
 
 # Create REST API server for IKEv2
 log "Setting up API server..."
-cat > server.js << 'EOL'
+cat > server.js << \EOF
+
 #!/usr/bin/env node
 const express = require('express');
 const cors = require('cors');
